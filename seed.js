@@ -109,13 +109,6 @@ window.__seed.fillDemoData = function(){
       {id:F.uid(), name:"羅同學", seminarDate:F.addDays(today,-6), signedUpDate:F.addDays(today,-6), lineJoinDate:"", consultDate:"", purchaseDate:"", note:"剛報名", isDemo:true, deletedAt:null}
     );
   }
-  if(!DB.work.zhi.lineJoins.length){
-    demoFlags.zhiLineJoin = true;
-    DB.work.zhi.lineJoins.push(
-      {id:F.uid(), lineName:"Momo", date:F.addDays(today,-2), promoted:false, isDemo:true, deletedAt:null},
-      {id:F.uid(), lineName:"David L.", date:F.addDays(today,-1), promoted:false, isDemo:true, deletedAt:null}
-    );
-  }
   if(!DB.work.zhi.sales.length){
     demoFlags.zhiSales = true;
     var saleId1 = F.uid();

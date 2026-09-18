@@ -415,52 +415,6 @@ function renderZhiSeminar(){
   return html;
 }
 
-/* ---------- LINE 加入名單 ---------- */
-F.addZhiLineJoin = function(){
-  var input = document.getElementById("zhiLineJoinName");
-  var name = input.value.trim();
-  if(!name){ F.toast("請輸入LINE名字"); return; }
-  F.DB.work.zhi.lineJoins.push({id:F.uid(), lineName:name, date:F.todayStr(), promoted:false, deletedAt:null});
-  input.value = "";
-  F.save(); F.render();
-};
-F.deleteZhiLineJoin = function(t){ F.softDelete(F.DB.work.zhi.lineJoins, t.getAttribute("data-id")); F.save(); F.render(); };
-F.promoteZhiLineJoin = function(t){
-  var id = t.getAttribute("data-id");
-  var j = F.DB.work.zhi.lineJoins.find(function(x){return x.id===id;});
-  if(!j) return;
-  F.DB.work.zhi.customers.push({id:F.uid(), name:j.lineName, status:"進到官方LINE", lineJoinDate:j.date, note:"", deletedAt:null});
-  j.promoted = true;
-  F.save(); F.toast("已建立學生記錄："+j.lineName); F.render();
-};
-window.__PAGE_AFTER.zhiLineJoinEnterKey = null;
-function renderZhiLineJoins(){
-  var all = F.alive(F.DB.work.zhi.lineJoins).sort(function(a,b){return b.date.localeCompare(a.date);});
-  var today = F.todayStr();
-  var wr = F.weekRangeOf(today);
-  var weekCount = all.filter(function(j){return F.inWeek(j.date, wr);}).length;
-  var monthCount = all.filter(function(j){return F.inMonth(j.date, today.slice(0,7));}).length;
-  var html = '<div class="card section">'+
-    '<div class="card-title">📥 LINE 加入名單 '+F.helpBtn("zhi_linejoin")+'</div>'+
-    '<div class="row" style="margin-bottom:10px"><input id="zhiLineJoinName" placeholder="輸入LINE名字，Enter新增"><button class="btn" data-action="addZhiLineJoin">新增</button></div>'+
-    '<div class="row" style="text-align:center">'+
-      '<div class="card" style="flex:1"><div style="font-size:22px;font-weight:800;color:var(--primary-dark)">'+weekCount+'</div><div style="font-size:11.5px;color:var(--muted)">本週(一~日)加入</div></div>'+
-      '<div class="card" style="flex:1"><div style="font-size:22px;font-weight:800;color:var(--primary-dark)">'+monthCount+'</div><div style="font-size:11.5px;color:var(--muted)">本月加入</div></div>'+
-    '</div></div>';
-  html += '<div class="section-head"><h2>名單清單</h2></div>';
-  if(!all.length){
-    html += '<div class="empty-state"><div class="e-ico">📥</div><div>還沒有人加入LINE</div></div>';
-  } else {
-    html += '<div class="list">'+all.map(function(j){
-      return '<div class="list-item"><div class="li-body"><div class="li-title">'+F.escapeHtml(j.lineName)+'</div>'+
-        '<div class="li-meta">'+F.fmtDate(j.date)+(j.promoted?' <span class="pill">已建立學生</span>':'')+'</div></div>'+
-        '<div class="li-actions">'+(!j.promoted?'<button class="btn sm secondary" data-action="promoteZhiLineJoin" data-id="'+j.id+'">建立學生記錄</button>':'')+
-        '<button class="btn sm ghost" data-action="deleteZhiLineJoin" data-id="'+j.id+'">刪除</button></div></div>';
-    }).join("")+'</div>';
-  }
-  return html;
-}
-
 /* ---------- 課程學生追蹤 + 銷售管理 ---------- */
 function courseOptionsZhi(sel){
   var list = F.DB.work.zhi.courses;
@@ -564,7 +518,7 @@ function renderZhiSales(){
         '<button class="btn sm ghost" data-action="openZhiSaleModal" data-id="'+s.id+'">編輯</button></div>';
     }).join("")+'</div>';
   }
-  return html+renderZhiTrack();
+  return html;
 }
 
 /* ---------- 設定（課程/付款方式） ---------- */
@@ -596,13 +550,11 @@ window.__ZHI_AFTER = function(){
   var s2 = document.getElementById("zhiStudentStatusSel");
   if(s2) s2.addEventListener("change", function(){ zhiStudentStatus = s2.value; F.render(); });
   document.querySelectorAll(".zhiQuickStatusSel").forEach(function(sel){ sel.onchange = function(){ F.zhiQuickStatus(sel); }; });
-  var lj = document.getElementById("zhiLineJoinName");
-  if(lj) lj.addEventListener("keydown", function(e){ if(e.key==="Enter") F.addZhiLineJoin(); });
 };
 
 var ZHI_SUB_TABS = [
   {key:"cal", label:"日曆紀錄"}, {key:"students", label:"學生資訊"}, {key:"seminar", label:"講座名單"},
-  {key:"linejoin", label:"LINE加入名單"}, {key:"track_sales", label:"課程/銷售"}, {key:"settings", label:"設定"}
+  {key:"track", label:"課程學生追蹤"}, {key:"sales", label:"銷售管理"}, {key:"settings", label:"設定"}
 ];
 function renderZhiRoot(){
   var html = '<div class="tabs" style="margin-top:6px">'+ZHI_SUB_TABS.map(function(s){
@@ -611,8 +563,8 @@ function renderZhiRoot(){
   if(zhiSub==="cal") html += renderZhiCalendar();
   else if(zhiSub==="students") html += renderZhiStudents();
   else if(zhiSub==="seminar") html += renderZhiSeminar();
-  else if(zhiSub==="linejoin") html += renderZhiLineJoins();
-  else if(zhiSub==="track_sales") html += renderZhiSales();
+  else if(zhiSub==="track") html += renderZhiTrack();
+  else if(zhiSub==="sales") html += renderZhiSales();
   else if(zhiSub==="settings") html += renderZhiSettings();
   return html;
 }

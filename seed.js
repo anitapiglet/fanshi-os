@@ -95,10 +95,32 @@ window.__seed.fillDemoData = function(){
   if(!DB.work.zhi.customers.length){
     demoFlags.zhi = true;
     DB.work.zhi.customers.push(
-      {id:F.uid(), name:"陳同學", source:"測驗quiz", stage:"已預約", notes:"目標7.0，預計12月考試", lastContactTs:Date.now()-1*86400000, isDemo:true, deletedAt:null},
-      {id:F.uid(), name:"林同學", source:"官網預約", stage:"已體驗", notes:"體驗課反饋良好，待報價", lastContactTs:Date.now()-5*86400000, isDemo:true, deletedAt:null},
-      {id:F.uid(), name:"黃同學", source:"轉介", stage:"已成交", notes:"60天保證班", lastContactTs:Date.now()-10*86400000, isDemo:true, deletedAt:null}
+      {id:F.uid(), name:"陳同學", status:"Intro", lineJoinDate:F.addDays(today,-9), introDate:F.addDays(today,-7), assessScore:"B1", toeicScore:"", ieltsToeflScore:"", note:"目標7.0，預計12月考試", isDemo:true, deletedAt:null},
+      {id:F.uid(), name:"林同學", status:"體驗課/線上講座", lineJoinDate:F.addDays(today,-14), introDate:F.addDays(today,-12), trialDate:F.addDays(today,-5), toeicScore:"", ieltsToeflScore:"6.0", note:"體驗課反饋良好，待報價", isDemo:true, deletedAt:null},
+      {id:F.uid(), name:"黃同學", status:"已購買", lineJoinDate:F.addDays(today,-20), introDate:F.addDays(today,-18), trialDate:F.addDays(today,-14), demoDate:F.addDays(today,-11), purchaseDate:F.addDays(today,-10), note:"60天保證班", isDemo:true, deletedAt:null},
+      {id:F.uid(), name:"周同學", status:"進到官方LINE", lineJoinDate:F.addDays(today,-2), note:"剛加入，尚未安排Intro", isDemo:true, deletedAt:null}
     );
+  }
+  if(!DB.work.zhi.seminars.length){
+    demoFlags.zhiSeminar = true;
+    DB.work.zhi.seminars.push(
+      {id:F.uid(), name:"游同學", seminarDate:F.addDays(today,-20), signedUpDate:F.addDays(today,-20), lineJoinDate:F.addDays(today,-19), consultDate:F.addDays(today,-15), purchaseDate:F.addDays(today,-12), note:"完整走完流程", isDemo:true, deletedAt:null},
+      {id:F.uid(), name:"許同學", seminarDate:F.addDays(today,-20), signedUpDate:F.addDays(today,-20), lineJoinDate:F.addDays(today,-19), consultDate:"", purchaseDate:"", note:"考慮中", isDemo:true, deletedAt:null},
+      {id:F.uid(), name:"羅同學", seminarDate:F.addDays(today,-6), signedUpDate:F.addDays(today,-6), lineJoinDate:"", consultDate:"", purchaseDate:"", note:"剛報名", isDemo:true, deletedAt:null}
+    );
+  }
+  if(!DB.work.zhi.lineJoins.length){
+    demoFlags.zhiLineJoin = true;
+    DB.work.zhi.lineJoins.push(
+      {id:F.uid(), lineName:"Momo", date:F.addDays(today,-2), promoted:false, isDemo:true, deletedAt:null},
+      {id:F.uid(), lineName:"David L.", date:F.addDays(today,-1), promoted:false, isDemo:true, deletedAt:null}
+    );
+  }
+  if(!DB.work.zhi.sales.length){
+    demoFlags.zhiSales = true;
+    var saleId1 = F.uid();
+    DB.work.zhi.sales.push({id:saleId1, student:"黃同學", purchaseDate:F.addDays(today,-10), amount:36000, payMethod:"刷卡分三期", course:"30hrs", startDate:F.addDays(today,-8), endDate:F.addDays(today,20), note:"30hrs班", isDemo:true, deletedAt:null});
+    DB.work.zhi.courseTracking.push({id:F.uid(), saleId:saleId1, name:"黃同學", course:"30hrs", startDate:F.addDays(today,-8), endDate:F.addDays(today,20), note:"30hrs班", isDemo:true, deletedAt:null});
   }
   if(!DB.inbox.length){
     demoFlags.inbox = true;
@@ -120,6 +142,9 @@ window.__seed.clearDemoData = function(){
   stripDemo(DB.info.news.domestic); stripDemo(DB.info.news.intl); stripDemo(DB.info.news.ai);
   stripDemo(DB.info.inspirations); stripDemo(DB.books.recommended); stripDemo(DB.books.podcasts); stripDemo(DB.books.mylist);
   stripDemo(DB.work.fanshi.clients); stripDemo(DB.work.zhi.customers); stripDemo(DB.work.courify.tasks); stripDemo(DB.inbox);
+  var demoTrackIds = (DB.work.zhi.courseTracking||[]).filter(function(t){return t.isDemo;}).map(function(t){return t.id;});
+  DB.tasks = DB.tasks.filter(function(t){ return !demoTrackIds.some(function(tid){ return t.id.indexOf("auto30_"+tid+"_")===0; }); });
+  stripDemo(DB.work.zhi.seminars); stripDemo(DB.work.zhi.lineJoins); stripDemo(DB.work.zhi.sales); stripDemo(DB.work.zhi.courseTracking);
   var f = DB.meta.demoFlags||{};
   if(f.cycle) DB.life.cycle = {lastStart:null, cycleLen:28, periodLen:5};
   if(f.weightPlan) DB.life.weightPlan = null;

@@ -5,7 +5,7 @@
 "use strict";
 
 var STORE_KEY = "fanshi_os_db_v1";
-var APP_VERSION = "1.0.0";
+var APP_VERSION = "1.1.0";
 window.__PAGES = window.__PAGES || {};
 window.__PAGE_AFTER = window.__PAGE_AFTER || {};
 window.__FS = window.__FS || {};
@@ -67,10 +67,19 @@ function blankDB(){
     content:{ pipeline:[], trending:[] },
     info:{ news:{domestic:[],intl:[],ai:[]}, inspirations:[] },
     books:{ recommended:[], podcasts:[], mylist:[] },
-    work:{ fanshi:{clients:[]}, zhi:{customers:[]}, courify:{tasks:[]} },
+    work:{
+      fanshi:{clients:[]},
+      zhi:{
+        customers:[], seminars:[], lineJoins:[], sales:[], courseTracking:[],
+        courses:['30hrs','30天上岸','6.0保證班','7.0保證班','14天衝刺','一對一','筆記','實力打造10','實力打造48','實力打造96','GE40','GE80','GE120','GE160','一對一50堂+保證班','一對一30堂+保證班'],
+        payMethods:['匯款','刷卡全額','刷卡分兩期','刷卡分三期','刷卡分六期']
+      },
+      courify:{tasks:[]}
+    },
     links:[],
     changelog:[
-      {date:"2026-09-16", version:"1.0.0", content:"凡蒔天地正式上線：今日總覽、收集箱、每日計劃、生活管理健身、自媒體運營、信息管理、我的書單、工作管理（凡蒔顧問／知英語／Courify）、設置八大模塊；建立跨模塊搜尋與關聯、AI 本地模擬建議（收集箱去向／每日跟練／熱點轉選題）、手機底部導覽與『更多』抽屜。", impact:"全新功能，不影響既有資料（尚無舊版本）。", action:"無需操作；可於今日頁點『填充演示數據』快速體驗。"}
+      {date:"2026-09-16", version:"1.0.0", content:"凡蒔天地正式上線：今日總覽、收集箱、每日計劃、生活管理健身、自媒體運營、信息管理、我的書單、工作管理（凡蒔顧問／知英語／Courify）、設置八大模塊；建立跨模塊搜尋與關聯、AI 本地模擬建議（收集箱去向／每日跟練／熱點轉選題）、手機底部導覽與『更多』抽屜。", impact:"全新功能，不影響既有資料（尚無舊版本）。", action:"無需操作；可於今日頁點『填充演示數據』快速體驗。"},
+      {date:"2026-09-18", version:"1.1.0", content:"知英語銷售顧問大改版：新增日曆紀錄（每日Intro/Demo追蹤+週報匯出）、學生資訊改為『進到官方LINE→程度檢測→Intro→體驗課/線上講座→Demo→已購買』新流程並加上多益/雅思托福/程度檢測分數欄位、月切換轉換率儀表板（長條圖+折線圖+Excel匯出）、講座名單簡化為報名/加入LINE/諮詢/成交四段漏斗、新增LINE加入名單快速記錄（自動週/月統計）、課程學生追蹤自動同步銷售紀錄，並新增30hrs課程5條自動待辦規則（會自動寫入今日→現在要做）。", impact:"知英語舊版客戶資料會自動轉換到新欄位（原名單/已預約/已體驗/已成交/流失 對應到新的狀態），不會遺失；30hrs自動待辦僅在課程名稱含『30hrs』且填了開課/結束日期時才會產生。", action:"若之前手動建立過知英語客戶，建議打開確認一次新欄位是否需要補填日期；其餘無需操作。"}
     ],
     settingsUi:{ lastBackupAt:null }
   };
@@ -97,6 +106,17 @@ var DB = load() || blankDB();
   merge(DB.work.zhi, b.work.zhi);
   merge(DB.work.courify, b.work.courify);
   merge(DB.plan, b.plan);
+  var ZHI_STAGE_MAP = {'名單':'進到官方LINE','已預約':'Intro','已體驗':'體驗課/線上講座','已成交':'已購買','流失':'lost deal'};
+  DB.work.zhi.customers.forEach(function(c){
+    if(c.lineJoinDate!==undefined) return; // already new shape
+    var d0 = c.lastContactTs ? toISODate(new Date(c.lastContactTs)) : "";
+    c.lineJoinDate = d0; c.assessScore=""; c.assessDate=""; c.toeicScore=""; c.ieltsToeflScore="";
+    c.introDate=""; c.onlineSeminarDate=""; c.trialDate=""; c.demoDate="";
+    c.purchaseDate = c.stage==="已成交" ? d0 : "";
+    c.lostDate = c.stage==="流失" ? d0 : "";
+    c.status = ZHI_STAGE_MAP[c.stage] || "進到官方LINE";
+    c.note = c.note || c.notes || "";
+  });
 })();
 save();
 
@@ -121,6 +141,13 @@ var HELP = {
   books_reco:{t:"精選推薦", w:"依您設定的興趣（AI／成長／效率）比對書單資料，顯示匹配度徽標。", h:"點『加入書單』會把推薦書加入下方『個人書單』，並可點外部連結到豆瓣查看詳情。", r:"加入後可在個人書單設定分類/狀態/評分。", u:"個人書單中可直接刪除該筆，不影響原推薦清單。", e:"若都是同一個匹配度，代表興趣設定尚未細分，可到設置調整興趣關鍵字。"},
   books_mylist:{t:"個人書單", w:"管理您實際在讀/想讀/讀完的書籍與播客，可分類與評分。", h:"新增時填標題/分類/狀態；讀完後可補上星級評分與進度。", r:"『進行中』且有進度的書會顯示在今日頁『學習進度』卡。", u:"刪除後可在垃圾桶找回。", e:"若學習進度卡一直空白，代表尚無狀態為『進行中』且有進度值的書籍。"},
   work_fanshi:{t:"凡蒔顧問業務", w:"追蹤凡蒔顧問（網站架設／顧問外包／健身纖體）的客戶與案件進度。", h:"新增客戶時填名稱/業務類型/階段/下一步；用下拉切換階段。", r:"階段變化會反映在工作管理總覽與今日『異常/待確認』判斷（例如太久沒更新會被標記停滯）。", u:"刪除的客戶紀錄可在垃圾桶還原。", e:"若同一客戶出現在多個業務類型，建議分開建立多筆，避免階段互相干擾。"},
+  zhi_calendar:{t:"日曆紀錄", w:"以月曆檢視每天有哪些學生加入LINE、Intro、體驗/線上講座、Demo或已購買，方便彙整每週工作報告。", h:"點日曆格子查看當天所有紀錄；點『＋新增學生』可直接以該天為加入LINE日期新增；『匯出本週週報』會把當週所有Intro/Demo整理成Excel。", r:"新增或編輯學生資料後，日曆格子上的角標數字會立即更新。", u:"到學生資訊分頁編輯或刪除該學生即可反映回日曆。", e:"若格子沒有角標，代表當天沒有任何學生的關鍵日期落在這天。"},
+  zhi_student:{t:"學生資訊 / 轉換率儀表板", w:"追蹤每位學生從加入官方LINE到成交的完整歷程，並依月份統計「加入LINE→Intro→體驗/線上講座→Demo→已購買」四段轉換率。", h:"點『＋新增學生』填寫各階段日期；卡片上的狀態下拉可快速更新目前階段（會自動補上對應日期，若已填則不覆蓋）。", r:"轉換率圖表與人數會即時依所選月份重新計算；可匯出當月報表。", u:"卡片『查看/編輯』可修改或刪除；日期填錯可直接改回。", e:"若某段轉換率顯示 0%，通常是該階段還沒有人到達下一步，非系統錯誤。"},
+  zhi_funnel:{t:"轉換率圖表", w:"長條圖顯示每週加入LINE人數，折線圖顯示本月各階段轉換率。", h:"用上/本/下月切換區間；點『匯出本月報表』下載Excel。", r:"純資訊呈現，不會修改任何學生資料。", u:"無需撤銷。", e:"若圖表是平的，代表該月資料量太少或還沒有人加入LINE。"},
+  zhi_seminar:{t:"講座名單", w:"管理講座/Webinar報名名單，追蹤『報名→加入LINE→諮詢→成交』四階段轉換率，可依月份切換。", h:"點『＋新增』登記報名者與各階段日期；『匯出Excel』輸出完整名單。", r:"漏斗圖表與轉換率會依填入的日期即時計算。", u:"清單項目可編輯或刪除。", e:"若漏斗顯示都是0，請確認有沒有填報名日期，這是漏斗的起點。"},
+  zhi_linejoin:{t:"LINE 加入名單", w:"最快速記錄『誰加入了官方LINE』的地方，只要打名字就好，系統會自動用週(一~日)和月份統計人數。", h:"輸入LINE顯示名稱後按Enter或點新增；之後可點『建立學生記錄』把這筆快速轉成完整的學生資訊卡片。", r:"新增後立即計入本週/本月統計數字，也會被學生資訊的『加入LINE總人數』採計（建立學生記錄後）。", u:"刪除該筆即可，不影響已經轉出去的學生記錄。", e:"若統計數字看起來不對，檢查日期是否跨到上/下週或上/下月。"},
+  zhi_track:{t:"課程學生追蹤", w:"銷售管理新增的成交紀錄會自動同步到這裡；其中課程含「30hrs」且填了開課/結束日期的學生，系統會自動生成待辦提醒。", h:"這裡的資料是唯讀同步結果，開課/結束日期要到銷售管理的成交紀錄裡修改。", r:"30hrs自動待辦會出現在『今日→現在要做』與『每日計劃』，標籤為『30hrs自動』。", u:"刪除此列不會刪除原始成交紀錄；要修正日期請到銷售管理編輯。", e:"若沒看到自動待辦，請確認課程名稱裡有包含『30hrs』字樣，且開課/結束日期都已填寫。"},
+  zhi_sales:{t:"銷售管理", w:"記錄每一筆成交（金額、付款方式、課程、開課/結束日期），並自動同步到課程學生追蹤。", h:"點『＋新增成交紀錄』填寫；課程可複選；付款方式可用分頁篩選並個別匯出Excel。", r:"成交金額會計入總營收與平均客單價；同步建立/更新對應的課程學生追蹤列。", u:"刪除成交紀錄會一併移除對應的課程學生追蹤列（可在垃圾桶恢復）。", e:"若客單價顯示異常，檢查是否有金額輸入為0或負數的紀錄。"},
   work_zhi:{t:"知英語銷售顧問", w:"沿用原本『諮詢體驗小日記』的客戶追蹤邏輯（名單→已預約→已體驗→已成交/流失），介面改為凡蒔天地墨綠風格並整合進工作管理。", h:"新增客戶填來源/姓名/備註；用階段下拉更新目前進度；『最後聯繫』會自動記錄操作時間。", r:"停滯超過設定天數未更新的客戶會出現在今日『異常』；已預約但尚未體驗的會出現在『最近可以繼續』。", u:"刪除的客戶可在垃圾桶還原；階段可隨時改回前一步。", e:"若客戶清單是空的，這是全新模塊尚未匯入舊資料，可先用『新增客戶』手動建立或用示例資料體驗。"},
   work_courify:{t:"Courify 行銷", w:"目前是全新的空模塊，用於之後累積 Courify 相關的客戶、任務與內容，尚未有任何真實資料匯入。", h:"點『新增任務』開始記錄；結構與凡蒔顧問業務類似，方便之後擴充。", r:"新增後即成為工作管理下的真實資料，可被搜尋與關聯。", u:"刪除任務可在垃圾桶還原。", e:"若您預期這裡應該有舊資料，這是正確的——Courify 目前刻意保持空白，等您之後補充。"},
   search_global:{t:"跨模塊搜尋", w:"同時比對任務、內容選題、靈感、書單、工作客戶與收集箱裡的文字，不用記得東西存在哪個模塊。", h:"輸入關鍵字後按 Enter 或點搜尋圖示；點結果直接跳到來源模塊定位該項目。", r:"不會修改任何資料，純粹是查找定位。", u:"無需撤銷。", e:"若找不到，嘗試更短的關鍵字，或確認資料是否被刪除到垃圾桶。"},
@@ -236,6 +263,119 @@ function aiGenerateWorkout(phase){
 }
 function aiTopicFromSource(sourceLabel, text){
   return { title: "【選題】"+text.slice(0,24), stage:"idea", sourceNote:sourceLabel };
+}
+
+/* ---------------- Excel (.xls) export ---------------- */
+function exportExcel(filename, sheetName, headers, rows){
+  var escCell = function(v){ return String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); };
+  var xml = '<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n';
+  xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" xmlns:html="http://www.w3.org/TR/REC-html40">\n';
+  xml += '<Styles><Style ss:ID="hdr"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#2F5D50" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/></Style></Styles>\n';
+  xml += '<Worksheet ss:Name="'+escCell(sheetName).slice(0,31)+'">\n<Table>\n<Row>\n';
+  headers.forEach(function(h){ xml += '<Cell ss:StyleID="hdr"><Data ss:Type="String">'+escCell(h)+'</Data></Cell>\n'; });
+  xml += '</Row>\n';
+  rows.forEach(function(r){
+    xml += '<Row>\n';
+    headers.forEach(function(h,i){
+      var v = r[i];
+      if(typeof v==="number" && isFinite(v)) xml += '<Cell><Data ss:Type="Number">'+v+'</Data></Cell>\n';
+      else xml += '<Cell><Data ss:Type="String">'+escCell(v)+'</Data></Cell>\n';
+    });
+    xml += '</Row>\n';
+  });
+  xml += '</Table>\n</Worksheet>\n</Workbook>';
+  var blob = new Blob(["﻿", xml], {type:"application/vnd.ms-excel;charset=utf-8"});
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 300);
+}
+
+/* ---------------- mini SVG charts (bar / line) ---------------- */
+function barChartSvg(items, opts){
+  opts = opts||{};
+  var w = opts.w||560, h = opts.h||160, pad=28, barW = (w-pad*2)/items.length*0.6;
+  var max = Math.max(1, opts.max||Math.max.apply(null, items.map(function(i){return i.value;})));
+  var gap = (w-pad*2)/items.length;
+  var bars = items.map(function(it,i){
+    var bh = (it.value/max)*(h-pad*1.6);
+    var x = pad + gap*i + (gap-barW)/2;
+    var y = h-pad - bh;
+    return '<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="'+bh+'" rx="4" fill="'+(it.color||"var(--primary)")+'"/>' +
+      '<text x="'+(x+barW/2)+'" y="'+(y-6)+'" font-size="10.5" text-anchor="middle" fill="#3a463f">'+it.value+'</text>'+
+      '<text x="'+(x+barW/2)+'" y="'+(h-8)+'" font-size="10.5" text-anchor="middle" fill="#8b978f">'+escapeHtml(it.label)+'</text>';
+  }).join("");
+  return '<svg viewBox="0 0 '+w+' '+h+'" width="100%" height="'+h+'" preserveAspectRatio="xMinYMid meet"><line x1="'+pad+'" y1="'+(h-pad)+'" x2="'+(w-pad)+'" y2="'+(h-pad)+'" stroke="#e2e6de"/>'+bars+'</svg>';
+}
+function lineChartSvg(items, opts){
+  opts = opts||{};
+  var w = opts.w||560, h = opts.h||150, pad=28;
+  var max = Math.max(1, opts.max||Math.max.apply(null, items.map(function(i){return i.value;})));
+  var step = (w-pad*2)/Math.max(items.length-1,1);
+  var pts = items.map(function(it,i){ return (pad+i*step)+","+(h-pad-(it.value/max)*(h-pad*1.6)); });
+  var labels = items.map(function(it,i){
+    return '<text x="'+(pad+i*step)+'" y="'+(h-8)+'" font-size="10.5" text-anchor="middle" fill="#8b978f">'+escapeHtml(it.label)+'</text>'+
+      '<circle cx="'+(pad+i*step)+'" cy="'+(h-pad-(it.value/max)*(h-pad*1.6))+'" r="3" fill="'+(opts.color||"var(--primary)")+'"/>'+
+      '<text x="'+(pad+i*step)+'" y="'+(h-pad-(it.value/max)*(h-pad*1.6)-8)+'" font-size="10.5" text-anchor="middle" fill="#3a463f">'+it.value+(opts.suffix||"")+'</text>';
+  }).join("");
+  return '<svg viewBox="0 0 '+w+' '+h+'" width="100%" height="'+h+'" preserveAspectRatio="xMinYMid meet"><line x1="'+pad+'" y1="'+(h-pad)+'" x2="'+(w-pad)+'" y2="'+(h-pad)+'" stroke="#e2e6de"/>'+
+    '<polyline points="'+pts.join(" ")+'" fill="none" stroke="'+(opts.color||"var(--primary)")+'" stroke-width="2.4"/>'+labels+'</svg>';
+}
+
+/* ---------------- week/month bucketing ---------------- */
+function weekRangeOf(dateStr){ var s = startOfWeek(dateStr); return {start:s, end:addDays(s,6)}; }
+function inMonth(dateStr, ym){ return dateStr && dateStr.slice(0,7)===ym; }
+function inWeek(dateStr, wr){ return dateStr && dateStr>=wr.start && dateStr<=wr.end; }
+function monthLabel(ym){ var p=ym.split("-"); return p[0]+"年"+p[1]+"月"; }
+function shiftMonth(ym, n){ var p=ym.split("-"); var d=new Date(+p[0], +p[1]-1+n, 1); return d.getFullYear()+"-"+pad(d.getMonth()+1); }
+
+/* ---------------- generic funnel conversion calc ---------------- */
+function computeFunnel(records, stageFields, periodFilterFn){
+  var counts = stageFields.map(function(f){
+    return records.filter(function(r){ return r[f.field] && periodFilterFn(r[f.field]); }).length;
+  });
+  var rates = [];
+  for(var i=0;i<stageFields.length-1;i++){
+    var fromCount = records.filter(function(r){ return r[stageFields[i].field] && periodFilterFn(r[stageFields[i].field]); }).length;
+    var toCount = records.filter(function(r){ return r[stageFields[i].field] && periodFilterFn(r[stageFields[i].field]) && r[stageFields[i+1].field]; }).length;
+    rates.push({from:stageFields[i].label, to:stageFields[i+1].label, rate: fromCount? Math.round(toCount/fromCount*100):0, fromCount:fromCount, toCount:toCount});
+  }
+  return {counts:counts, rates:rates};
+}
+
+/* ---------------- 30hrs 自動待辦 ---------------- */
+function lastWedMondayOf(endDate){
+  if(!endDate) return null;
+  var d = new Date(endDate+"T00:00:00");
+  var wd = d.getDay();
+  var diffToWed = (wd - 3 + 7) % 7;
+  var lastWed = addDays(endDate, -diffToWed);
+  return addDays(lastWed, -2);
+}
+function run30hrsAutomation(){
+  var changed = false;
+  DB.work.zhi.courseTracking.forEach(function(ct){
+    if(ct.deletedAt) return;
+    if(!ct.course || ct.course.indexOf("30hrs")===-1) return;
+    if(!ct.startDate || !ct.endDate) return;
+    var rules = [
+      {key:"week2", date: addDays(ct.startDate,7), title: ct.name+" 預約寫作/口說 實戰課程"},
+      {key:"mockAfter", date: addDays(ct.endDate,-7), title: ct.name+" Mock test after"},
+      {key:"missHw", date: addDays(ct.endDate,-7), title: "詢問老師 "+ct.name+" 缺作業"},
+      {key:"speakMonday", date: lastWedMondayOf(ct.endDate), title: "要和老師說 "+ct.name+" speaking mock test"},
+      {key:"postConsult", date: addDays(ct.endDate,7), title: "預約 "+ct.name+" Anita諮詢"}
+    ];
+    rules.forEach(function(r){
+      if(!r.date) return;
+      var autoId = "auto30_"+ct.id+"_"+r.key;
+      if(!DB.tasks.some(function(t){ return t.id===autoId; })){
+        DB.tasks.push({id:autoId, title:r.title, date:r.date, time:"", category:"知英語", priority:"高", tags:["30hrs自動"], done:false, createdAt:Date.now(), deletedAt:null, source:"30hrs-auto"});
+        changed = true;
+      }
+    });
+  });
+  if(changed) save();
+  return changed;
 }
 
 /* ---------------- search index ---------------- */
@@ -532,10 +672,22 @@ window.__FS.render = render;
 window.__FS.HELP = HELP;
 window.__FS.PHASES = PHASES;
 window.__FS.APP_VERSION = APP_VERSION;
+window.__FS.exportExcel = exportExcel;
+window.__FS.barChartSvg = barChartSvg;
+window.__FS.lineChartSvg = lineChartSvg;
+window.__FS.weekRangeOf = weekRangeOf;
+window.__FS.inMonth = inMonth;
+window.__FS.inWeek = inWeek;
+window.__FS.monthLabel = monthLabel;
+window.__FS.shiftMonth = shiftMonth;
+window.__FS.computeFunnel = computeFunnel;
+window.__FS.run30hrsAutomation = run30hrsAutomation;
+window.__FS.pad = pad;
 
 window.__FS.init = function(){
   var r = (window.location.hash||"").replace("#/","");
   if(ROUTES[r]) currentRoute = r;
+  run30hrsAutomation();
   render();
 };
 

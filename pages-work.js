@@ -67,6 +67,13 @@ var zhiStudentSearch = "";
 var zhiStudentStatus = "";
 var zhiSeminarMonth = F.todayStr().slice(0,7);
 var zhiSalesPay = "全部";
+var zhiInstallMonth = F.todayStr().slice(0,7);
+var zhiTrackSearch = "";
+var zhiTrackView = "general";
+var zhiOOSearch = "";
+var zhiCalcSessions = 10;
+var ZHI_TEACHERS = ["Joanna","Florence","Jake","Other"];
+var ZHI_SUBJECTS = ["聽","說","讀","寫"];
 
 var ZHI_STAGES = [
   {key:"進到官方LINE", color:"#77877e"},
@@ -421,13 +428,15 @@ function courseOptionsZhi(sel){
   var selArr = Array.isArray(sel)?sel:(sel?String(sel).split(/[、,]/).map(function(s){return s.trim();}).filter(Boolean):[]);
   return '<div class="multi-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px">'+list.map(function(c){
     var on = selArr.indexOf(c)>-1;
-    return '<label style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:#fafbf8;border:1px solid var(--border);border-radius:8px;font-size:12.5px;cursor:pointer"><input type="checkbox" class="zhiCourseChk" value="'+F.escapeHtml(c)+'" '+(on?"checked":"")+'>'+F.escapeHtml(c)+'</label>';
+    var isOO = c==="一對一";
+    return '<label style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:#fafbf8;border:1px solid var(--border);border-radius:8px;font-size:12.5px;cursor:pointer"><input type="checkbox" class="zhiCourseChk'+(isOO?" zhiOOChk":"")+'" value="'+F.escapeHtml(c)+'" '+(on?"checked":"")+'>'+F.escapeHtml(c)+'</label>';
   }).join("")+'</div>';
 }
 F.openZhiSaleModal = function(t){
   var id = t && t.getAttribute("data-id");
   var s = id ? F.DB.work.zhi.sales.find(function(x){return x.id===id;}) : null;
   var payOpts = F.DB.work.zhi.payMethods.map(function(p){ return '<option '+(s&&s.payMethod===p?"selected":"")+'>'+F.escapeHtml(p)+'</option>'; }).join("");
+  var ooSelected = s && s.course && s.course.indexOf("一對一")>-1;
   F.openModal(
     '<div class="modal-title">'+(s?"編輯":"＋新增")+'成交紀錄 '+F.helpBtn("zhi_sales")+'</div>'+
     '<form id="zhiSaleForm">'+
@@ -436,6 +445,7 @@ F.openZhiSaleModal = function(t){
     '<div class="row" style="margin-top:8px"><label class="field">成交金額<input type="number" name="amount" min="0" step="100" value="'+(s?s.amount:"")+'"></label>'+
     '<label class="field">付款方式<select name="payMethod">'+payOpts+'</select></label></div>'+
     '<label class="field full" style="margin-top:8px">課程（可複選）</label><div id="zhiSaleCourseMulti">'+courseOptionsZhi(s?s.course:"")+'</div>'+
+    '<div id="zhiOOSessionsWrap" style="display:'+(ooSelected?"block":"none")+';margin-top:8px"><label class="field">一對一購買堂數<input type="number" min="1" name="oneOnOneSessions" value="'+(s?s.oneOnOneSessions||"":"")+'" placeholder="例如 10"></label></div>'+
     '<div class="row" style="margin-top:8px"><label class="field">開課日期<input type="date" name="startDate" value="'+(s?s.startDate||"":"")+'"></label>'+
     '<label class="field">課程結束日期<input type="date" name="endDate" value="'+(s?s.endDate||"":"")+'"></label></div>'+
     '<label class="field" style="margin-top:8px">備註<textarea name="note" rows="2">'+(s?F.escapeHtml(s.note||""):"")+'</textarea></label>'+
@@ -444,12 +454,16 @@ F.openZhiSaleModal = function(t){
       '<button class="btn" type="submit" style="flex:2">儲存</button></div>'+
     '</form>', {wide:true}
   );
+  var ooChk = document.querySelector(".zhiOOChk");
+  var ooWrap = document.getElementById("zhiOOSessionsWrap");
+  if(ooChk){ ooChk.addEventListener("change", function(){ ooWrap.style.display = ooChk.checked ? "block" : "none"; }); }
   document.getElementById("zhiSaleForm").addEventListener("submit", function(e){
     e.preventDefault();
     var f = e.target;
     var courses = Array.from(document.querySelectorAll(".zhiCourseChk:checked")).map(function(i){return i.value;});
     var obj = {student:f.student.value.trim(), purchaseDate:f.purchaseDate.value, amount:Math.max(0,Number(f.amount.value)||0),
-      payMethod:f.payMethod.value, course:courses.join("、"), startDate:f.startDate.value, endDate:f.endDate.value, note:f.note.value.trim()};
+      payMethod:f.payMethod.value, course:courses.join("、"), startDate:f.startDate.value, endDate:f.endDate.value, note:f.note.value.trim(),
+      oneOnOneSessions: courses.indexOf("一對一")>-1 ? (f.oneOnOneSessions.value||"") : ""};
     var saleObj;
     if(s){ Object.assign(s, obj); saleObj = s; } else { saleObj = Object.assign({id:F.uid(), deletedAt:null}, obj); F.DB.work.zhi.sales.push(saleObj); }
     var track = F.DB.work.zhi.courseTracking.find(function(x){return x.saleId===saleObj.id;});
@@ -478,12 +492,15 @@ F.exportZhiSalesFiltered = function(){
   F.exportExcel("知英語_銷售_"+zhiSalesPay+".xls", zhiSalesPay, ["學生姓名","購買日期","成交金額","付款方式","課程","開課日期","備註"], rows);
   F.toast("已匯出「"+zhiSalesPay+"」共 "+rows.length+" 筆");
 };
-function renderZhiTrack(){
-  var all = F.alive(F.DB.work.zhi.courseTracking);
-  var html = '<div class="section-head"><h2>📘 課程學生追蹤 '+F.helpBtn("zhi_track")+'</h2></div>';
+F.setZhiTrackView = function(t){ zhiTrackView = t.getAttribute("data-view"); F.render(); };
+F.filterZhiTrackSearch = function(){ zhiTrackSearch = document.getElementById("zhiTrackSearchInput").value; F.render(); };
+F.filterZhiOOSearch = function(){ zhiOOSearch = document.getElementById("zhiOOSearchInput").value; F.render(); };
+function renderZhiTrackGeneral(){
+  var all = F.alive(F.DB.work.zhi.courseTracking).filter(function(t){ return !zhiTrackSearch || t.name.indexOf(zhiTrackSearch)>-1; });
+  var html = '<div class="row" style="margin-bottom:12px"><input id="zhiTrackSearchInput" placeholder="搜尋學生姓名..." value="'+F.escapeHtml(zhiTrackSearch)+'"></div>';
   html += '<div class="card" style="margin-bottom:14px;background:#eef2ec"><b>30hrs 自動待辦：</b>只要課程含「30hrs」且填了開課/結束日期，系統會自動在「今日→現在要做」產生：第2週提醒預約寫作/口說實戰課、結束前一週 Mock test after 與詢問老師缺作業、結束前最後一個週三所在週的週一提醒 speaking mock test、結束後一週提醒預約 Anita 諮詢。</div>';
   if(!all.length){
-    html += '<div class="empty-state"><div class="e-ico">📘</div><div>尚無已購課學生（在銷售管理新增成交紀錄會自動同步過來）</div></div>';
+    html += '<div class="empty-state"><div class="e-ico">📘</div><div>尚無符合條件的已購課學生（在銷售管理新增成交紀錄會自動同步過來）</div></div>';
   } else {
     html += '<div class="table-wrap" style="overflow-x:auto"><table class="tbl" style="width:100%;border-collapse:collapse;font-size:13px">'+
       '<thead><tr><th style="text-align:left;padding:8px">姓名</th><th style="text-align:left;padding:8px">課程</th><th style="text-align:left;padding:8px">開課</th><th style="text-align:left;padding:8px">結束</th><th style="padding:8px"></th></tr></thead><tbody>'+
@@ -493,6 +510,97 @@ function renderZhiTrack(){
           '<td style="padding:8px"><button class="btn sm ghost" data-action="deleteZhiTrack" data-id="'+t.id+'">刪除</button></td></tr>';
       }).join("")+'</tbody></table></div>';
   }
+  return html;
+}
+/* ---- 一對一 母分頁 ---- */
+function syncOneOnOneToTrack(oo){
+  var track = F.DB.work.zhi.courseTracking.find(function(x){return x.oneOnOneId===oo.id;});
+  if(!track){ track = {id:F.uid(), oneOnOneId:oo.id, deletedAt:null, startDate:F.todayStr(), endDate:""}; F.DB.work.zhi.courseTracking.push(track); }
+  track.name = oo.name; track.course = "一對一";
+  track.note = "老師:"+(oo.teachers||[]).join("/")+" 科目:"+(oo.subjects||[]).join("/")+(oo.amount?" 金額:"+oo.amount:"");
+}
+F.runOneOnOneAutoCreate = function(){
+  var changed = false;
+  F.alive(F.DB.work.zhi.customers).forEach(function(c){
+    if(!c.assessDate) return;
+    var exists = F.DB.work.zhi.oneOnOne.some(function(x){return x.custId===c.id;});
+    if(!exists){
+      F.DB.work.zhi.oneOnOne.push({id:F.uid(), custId:c.id, name:c.name, teachers:[], paymentStatus:"尚未付款", payMethod:"", amount:"", classTime:"調整中", subjects:[], note:"", deletedAt:null});
+      changed = true;
+    }
+  });
+  if(changed) F.save();
+  return changed;
+};
+F.zhiOOQuickPay = function(sel){
+  var oo = F.DB.work.zhi.oneOnOne.find(function(x){return x.id===sel.getAttribute("data-id");});
+  if(!oo) return;
+  oo.paymentStatus = sel.value;
+  if(oo.paymentStatus==="已付款") syncOneOnOneToTrack(oo);
+  F.save(); F.render(); F.toast("已更新付款狀態");
+};
+F.openZhiOOModal = function(t){
+  var id = t.getAttribute("data-id");
+  var oo = F.DB.work.zhi.oneOnOne.find(function(x){return x.id===id;});
+  if(!oo) return;
+  var teacherBoxes = ZHI_TEACHERS.map(function(tc){
+    var on = (oo.teachers||[]).indexOf(tc)>-1;
+    return '<label style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:#fafbf8;border:1px solid var(--border);border-radius:8px;font-size:12.5px;cursor:pointer"><input type="checkbox" class="zhiOOTeacherChk" value="'+tc+'" '+(on?"checked":"")+'>'+tc+'</label>';
+  }).join("");
+  var subjBoxes = ZHI_SUBJECTS.map(function(sb){
+    var on = (oo.subjects||[]).indexOf(sb)>-1;
+    return '<label style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:#fafbf8;border:1px solid var(--border);border-radius:8px;font-size:12.5px;cursor:pointer"><input type="checkbox" class="zhiOOSubjectChk" value="'+sb+'" '+(on?"checked":"")+'>'+sb+'</label>';
+  }).join("");
+  var payOpts = F.DB.work.zhi.payMethods.map(function(p){return '<option '+(oo.payMethod===p?"selected":"")+'>'+F.escapeHtml(p)+'</option>';}).join("");
+  F.openModal(
+    '<div class="modal-title">編輯一對一：'+F.escapeHtml(oo.name)+' '+F.helpBtn("zhi_oneonone")+'</div>'+
+    '<form id="zhiOOForm">'+
+    '<label class="field">上課老師（可複選）</label><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;margin-bottom:8px">'+teacherBoxes+'</div>'+
+    '<div class="row"><label class="field">已付款/尚未付款<select name="paymentStatus"><option '+(oo.paymentStatus==="尚未付款"?"selected":"")+'>尚未付款</option><option '+(oo.paymentStatus==="已付款"?"selected":"")+'>已付款</option></select></label>'+
+    '<label class="field">付款方式<select name="payMethod"><option value="">—</option>'+payOpts+'</select></label></div>'+
+    '<div class="row" style="margin-top:8px"><label class="field">金額<input type="number" name="amount" min="0" value="'+(oo.amount||"")+'"></label>'+
+    '<label class="field">上課時間<select name="classTime"><option '+(oo.classTime==="已敲定"?"selected":"")+'>已敲定</option><option '+(oo.classTime==="調整中"?"selected":"")+'>調整中</option></select></label></div>'+
+    '<label class="field" style="margin-top:8px">科目（可複選）</label><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px">'+subjBoxes+'</div>'+
+    '<label class="field" style="margin-top:8px">備註<textarea name="note" rows="2">'+F.escapeHtml(oo.note||"")+'</textarea></label>'+
+    '<div class="row" style="margin-top:14px"><button type="button" class="btn danger" data-action="deleteZhiOO" data-id="'+oo.id+'">刪除</button><button class="btn" type="submit" style="flex:2">儲存</button></div>'+
+    '</form>', {wide:true}
+  );
+  document.getElementById("zhiOOForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var f = e.target;
+    oo.teachers = Array.from(document.querySelectorAll(".zhiOOTeacherChk:checked")).map(function(i){return i.value;});
+    oo.subjects = Array.from(document.querySelectorAll(".zhiOOSubjectChk:checked")).map(function(i){return i.value;});
+    oo.paymentStatus = f.paymentStatus.value; oo.payMethod = f.payMethod.value; oo.amount = f.amount.value; oo.classTime = f.classTime.value;
+    oo.note = f.note.value.trim();
+    if(oo.paymentStatus==="已付款") syncOneOnOneToTrack(oo);
+    F.save(); F.closeModal(); F.toast("已儲存"); F.render();
+  });
+};
+F.deleteZhiOO = function(t){ F.softDelete(F.DB.work.zhi.oneOnOne, t.getAttribute("data-id")); F.save(); F.closeModal(); F.toast("已刪除"); F.render(); };
+function renderZhiOneOnOne(){
+  var all = F.alive(F.DB.work.zhi.oneOnOne).filter(function(o){ return !zhiOOSearch || o.name.indexOf(zhiOOSearch)>-1; });
+  var html = '<div class="row" style="margin-bottom:12px"><input id="zhiOOSearchInput" placeholder="搜尋學生姓名..." value="'+F.escapeHtml(zhiOOSearch)+'"></div>';
+  html += '<div class="card" style="margin-bottom:14px;background:#eef2ec">學生在日曆紀錄/學生資訊填入「程度檢測日期」後，會自動出現在這裡；把「已付款/尚未付款」改成「已付款」會自動同步到上方「一般課程」追蹤列表。</div>';
+  if(!all.length){
+    html += '<div class="empty-state"><div class="e-ico">🧑‍🏫</div><div>目前沒有一對一追蹤學生</div><div class="e-next">下一步：到學生資訊填入某位學生的程度檢測日期，就會自動出現在這裡</div></div>';
+  } else {
+    html += '<div class="info-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">'+all.map(function(o){
+      return '<div class="card"><div style="font-weight:800;margin-bottom:6px">'+F.escapeHtml(o.name)+'</div>'+
+        '<select class="zhiOOPaySel" data-id="'+o.id+'" style="width:100%;margin-bottom:8px;font-size:12.5px"><option '+(o.paymentStatus==="尚未付款"?"selected":"")+'>尚未付款</option><option '+(o.paymentStatus==="已付款"?"selected":"")+'>已付款</option></select>'+
+        '<div style="font-size:12px;color:var(--muted);line-height:1.7">'+
+          '老師：'+((o.teachers||[]).join("、")||"—")+'<br>上課時間：'+(o.classTime||"—")+'<br>科目：'+((o.subjects||[]).join("、")||"—")+
+          (o.amount?'<br>金額：NT$ '+(+o.amount).toLocaleString():"")+
+        '</div>'+
+        '<button class="btn sm secondary" style="width:100%;margin-top:8px" data-action="openZhiOOModal" data-id="'+o.id+'">編輯</button></div>';
+    }).join("")+'</div>';
+  }
+  return html;
+}
+function renderZhiTrack(){
+  var html = '<div class="section-head"><h2>📘 課程學生追蹤 '+F.helpBtn("zhi_track")+'</h2></div>';
+  html += '<div class="tabs"><button class="'+(zhiTrackView==="general"?"active":"")+'" data-action="setZhiTrackView" data-view="general">一般課程</button>'+
+    '<button class="'+(zhiTrackView==="oneonone"?"active":"")+'" data-action="setZhiTrackView" data-view="oneonone">一對一</button></div>';
+  html += zhiTrackView==="oneonone" ? renderZhiOneOnOne() : renderZhiTrackGeneral();
   return html;
 }
 function renderZhiSales(){
@@ -516,6 +624,39 @@ function renderZhiSales(){
       return '<div class="list-item"><div class="li-body"><div class="li-title">'+F.escapeHtml(s.student)+'</div>'+
         '<div class="li-meta">'+F.fmtDate(s.purchaseDate)+' · NT$ '+(+s.amount).toLocaleString()+' · '+F.escapeHtml(s.payMethod)+' · '+F.escapeHtml(s.course||"")+'</div></div>'+
         '<button class="btn sm ghost" data-action="openZhiSaleModal" data-id="'+s.id+'">編輯</button></div>';
+    }).join("")+'</div>';
+  }
+  html += renderZhiInstallment();
+  return html;
+}
+F.zhiInstallMonthPrev = function(){ zhiInstallMonth = F.shiftMonth(zhiInstallMonth,-1); F.render(); };
+F.zhiInstallMonthNext = function(){ zhiInstallMonth = F.shiftMonth(zhiInstallMonth,1); F.render(); };
+F.zhiInstallMonthThis = function(){ zhiInstallMonth = F.todayStr().slice(0,7); F.render(); };
+function renderZhiInstallment(){
+  var ym = zhiInstallMonth;
+  var all = F.alive(F.DB.work.zhi.sales);
+  var monthlyRevenue = 0;
+  var rows = [];
+  all.forEach(function(s){
+    var sched = F.installmentSchedule(s);
+    var idx = sched.months.indexOf(ym);
+    if(idx>-1){
+      monthlyRevenue += sched.perPeriod;
+      if(sched.periods>1) rows.push({student:s.student, perPeriod:sched.perPeriod, label:(idx+1)+"/"+sched.periods, payMethod:s.payMethod, course:s.course, total:s.amount});
+    }
+  });
+  var html = '<div class="section-head" style="margin-top:20px"><h2 style="font-size:16px">📆 刷卡分期追蹤 '+F.helpBtn("zhi_install")+'</h2>'+
+    '<div class="row"><button class="btn sm secondary" data-action="zhiInstallMonthPrev">← 上月</button>'+
+    '<button class="btn sm secondary" data-action="zhiInstallMonthThis">本月</button>'+
+    '<button class="btn sm secondary" data-action="zhiInstallMonthNext">下月 →</button></div></div>';
+  html += '<div class="card" style="margin-bottom:10px"><div style="font-weight:800;font-size:16px">'+F.monthLabel(ym)+' 本月正確營業額（已依分期拆算）</div>'+
+    '<div style="font-size:24px;font-weight:800;color:var(--primary-dark);margin-top:4px">NT$ '+monthlyRevenue.toLocaleString()+'</div></div>';
+  if(!rows.length){
+    html += '<div class="empty-state"><div class="e-ico">📆</div><div>這個月沒有分期付款學生的期數落在此月</div></div>';
+  } else {
+    html += '<div class="list">'+rows.map(function(r){
+      return '<div class="list-item"><div class="li-body"><div class="li-title">'+F.escapeHtml(r.student)+' <span class="pill">第 '+r.label+' 期</span></div>'+
+        '<div class="li-meta">本期 NT$ '+r.perPeriod.toLocaleString()+' · 總額 NT$ '+(+r.total).toLocaleString()+' · '+F.escapeHtml(r.payMethod)+' · '+F.escapeHtml(r.course||"")+'</div></div></div>';
     }).join("")+'</div>';
   }
   return html;
@@ -544,17 +685,49 @@ function renderZhiSettings(){
   return html;
 }
 
+F.setZhiCalcSessions = function(){
+  zhiCalcSessions = Math.max(1, Number(document.getElementById("zhiCalcInput").value) || 1);
+  F.render();
+};
+function oneOnOnePrice(n){
+  var rate = n>=20?0.8 : n>=10?0.9 : n>=5?0.95 : 1;
+  return {rate:rate, total:Math.round(1800*n*rate)};
+}
+function renderZhiCalc(){
+  var n = zhiCalcSessions;
+  var oo = oneOnOnePrice(n);
+  var html = '<div class="section-head"><h2>🧮 價格試算 '+F.helpBtn("zhi_calc")+'</h2></div>';
+  html += '<div class="card" style="max-width:360px;margin-bottom:16px"><label class="field">堂數<input type="number" id="zhiCalcInput" min="1" value="'+n+'" oninput="void 0"></label></div>';
+  html += '<div class="grid grid-2">'+
+    '<div class="card"><div style="font-size:12px;color:var(--muted)">一對一（原價 $1800/堂，5堂95折/10堂9折/20堂以上8折）</div>'+
+    '<div style="font-size:22px;font-weight:800;color:var(--primary-dark);margin-top:4px">NT$ '+oo.total.toLocaleString()+'</div>'+
+    '<div style="font-size:11.5px;color:var(--muted);margin-top:2px">折扣：'+Math.round((1-oo.rate)*100)+'%　單堂約 NT$ '+Math.round(oo.total/n).toLocaleString()+'</div></div>'+
+    '<div class="card"><div style="font-size:12px;color:var(--muted)">固定費率方案</div>'+
+    [390,450,500].map(function(rate){
+      return '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:14px"><span>$'+rate+' × '+n+' 堂</span><b>NT$ '+(rate*n).toLocaleString()+'</b></div>';
+    }).join("")+
+    '</div></div>';
+  return html;
+}
+
 window.__ZHI_AFTER = function(){
   var s1 = document.getElementById("zhiStudentSearchInput");
   if(s1) s1.addEventListener("input", function(){ zhiStudentSearch = s1.value; F.render(); });
   var s2 = document.getElementById("zhiStudentStatusSel");
   if(s2) s2.addEventListener("change", function(){ zhiStudentStatus = s2.value; F.render(); });
   document.querySelectorAll(".zhiQuickStatusSel").forEach(function(sel){ sel.onchange = function(){ F.zhiQuickStatus(sel); }; });
+  var s3 = document.getElementById("zhiTrackSearchInput");
+  if(s3) s3.addEventListener("input", function(){ zhiTrackSearch = s3.value; F.render(); });
+  var s4 = document.getElementById("zhiOOSearchInput");
+  if(s4) s4.addEventListener("input", function(){ zhiOOSearch = s4.value; F.render(); });
+  document.querySelectorAll(".zhiOOPaySel").forEach(function(sel){ sel.onchange = function(){ F.zhiOOQuickPay(sel); }; });
+  var s5 = document.getElementById("zhiCalcInput");
+  if(s5) s5.addEventListener("input", F.setZhiCalcSessions);
 };
 
 var ZHI_SUB_TABS = [
   {key:"cal", label:"日曆紀錄"}, {key:"students", label:"學生資訊"}, {key:"seminar", label:"講座名單"},
-  {key:"track", label:"課程學生追蹤"}, {key:"sales", label:"銷售管理"}, {key:"settings", label:"設定"}
+  {key:"track", label:"課程學生追蹤"}, {key:"sales", label:"銷售管理"}, {key:"calc", label:"價格試算"}, {key:"settings", label:"設定"}
 ];
 function renderZhiRoot(){
   var html = '<div class="tabs" style="margin-top:6px">'+ZHI_SUB_TABS.map(function(s){
@@ -565,6 +738,7 @@ function renderZhiRoot(){
   else if(zhiSub==="seminar") html += renderZhiSeminar();
   else if(zhiSub==="track") html += renderZhiTrack();
   else if(zhiSub==="sales") html += renderZhiSales();
+  else if(zhiSub==="calc") html += renderZhiCalc();
   else if(zhiSub==="settings") html += renderZhiSettings();
   return html;
 }

@@ -5,7 +5,7 @@
 "use strict";
 
 var STORE_KEY = "fanshi_os_db_v1";
-var APP_VERSION = "1.1.1";
+var APP_VERSION = "1.2.0";
 window.__PAGES = window.__PAGES || {};
 window.__PAGE_AFTER = window.__PAGE_AFTER || {};
 window.__FS = window.__FS || {};
@@ -67,11 +67,13 @@ function blankDB(){
     content:{ pipeline:[], trending:[] },
     info:{ news:{domestic:[],intl:[],ai:[]}, inspirations:[] },
     books:{ recommended:[], podcasts:[], mylist:[] },
+    fairy:{ items:[] },
     work:{
       fanshi:{clients:[]},
       zhi:{
         customers:[], seminars:[], lineJoins:[], sales:[], courseTracking:[],
-        courses:['30hrs','30天上岸','6.0保證班','7.0保證班','14天衝刺','一對一','筆記','實力打造10','實力打造48','實力打造96','GE40','GE80','GE120','GE160','一對一50堂+保證班','一對一30堂+保證班'],
+        courses:['30hrs','30天上岸','6.0保證班','7.0保證班','14天衝刺','一對一','筆記','實力打造10','實力打造48','實力打造96','GE40','GE80','GE120','GE160','一對一50堂+保證班'],
+        oneOnOne:[],
         payMethods:['匯款','刷卡全額','刷卡分兩期','刷卡分三期','刷卡分六期']
       },
       courify:{tasks:[]}
@@ -80,7 +82,8 @@ function blankDB(){
     changelog:[
       {date:"2026-09-16", version:"1.0.0", content:"凡蒔天地正式上線：今日總覽、收集箱、每日計劃、生活管理健身、自媒體運營、信息管理、我的書單、工作管理（凡蒔顧問／知英語／Courify）、設置八大模塊；建立跨模塊搜尋與關聯、AI 本地模擬建議（收集箱去向／每日跟練／熱點轉選題）、手機底部導覽與『更多』抽屜。", impact:"全新功能，不影響既有資料（尚無舊版本）。", action:"無需操作；可於今日頁點『填充演示數據』快速體驗。"},
       {date:"2026-09-18", version:"1.1.0", content:"知英語銷售顧問大改版：新增日曆紀錄（每日Intro/Demo追蹤+週報匯出）、學生資訊改為『進到官方LINE→程度檢測→Intro→體驗課/線上講座→Demo→已購買』新流程並加上多益/雅思托福/程度檢測分數欄位、月切換轉換率儀表板（長條圖+折線圖+Excel匯出）、講座名單簡化為報名/加入LINE/諮詢/成交四段漏斗、新增LINE加入名單快速記錄（自動週/月統計）、課程學生追蹤自動同步銷售紀錄，並新增30hrs課程5條自動待辦規則（會自動寫入今日→現在要做）。", impact:"知英語舊版客戶資料會自動轉換到新欄位（原名單/已預約/已體驗/已成交/流失 對應到新的狀態），不會遺失；30hrs自動待辦僅在課程名稱含『30hrs』且填了開課/結束日期時才會產生。", action:"若之前手動建立過知英語客戶，建議打開確認一次新欄位是否需要補填日期；其餘無需操作。"},
-      {date:"2026-09-18", version:"1.1.1", content:"修正銷售管理新增成交紀錄裡課程複選框排版錯亂的問題（checkbox 被全域樣式撐成滿寬）；將『課程學生追蹤』從銷售管理拆成獨立分頁；移除『LINE加入名單』快速記錄分頁（加入LINE日期仍保留在學生資訊/講座名單欄位中，不影響轉換率計算）。", impact:"若之前用過LINE加入名單記錄過資料，資料還在，只是暫時沒有畫面可管理；未來如需要可以再加回來。", action:"無需操作。"}
+      {date:"2026-09-18", version:"1.1.1", content:"修正銷售管理新增成交紀錄裡課程複選框排版錯亂的問題（checkbox 被全域樣式撐成滿寬）；將『課程學生追蹤』從銷售管理拆成獨立分頁；移除『LINE加入名單』快速記錄分頁（加入LINE日期仍保留在學生資訊/講座名單欄位中，不影響轉換率計算）。", impact:"若之前用過LINE加入名單記錄過資料，資料還在，只是暫時沒有畫面可管理；未來如需要可以再加回來。", action:"無需操作。"},
+      {date:"2026-09-18", version:"1.2.0", content:"知英語新增：課程學生追蹤搜尋、刷卡分期追蹤（自動拆算每月正確營業額）、一對一母分頁（程度檢測日期自動觸發，已付款自動同步至課程學生追蹤）、課程選項調整（移除一對一30堂+保證班，一對一改為彈出填購買堂數）、價格試算工具。凡蒔天地新增『仙女媽咪專區』模組（狀態/優先級管理，高優先自動排前，可每日匯出Excel）。", impact:"知英語舊資料不受影響；仙女媽咪專區為全新空模塊。", action:"無需操作。"}
     ],
     settingsUi:{ lastBackupAt:null }
   };
@@ -102,6 +105,7 @@ var DB = load() || blankDB();
   merge(DB.info, b.info);
   merge(DB.info.news, b.info.news);
   merge(DB.books, b.books);
+  merge(DB.fairy, b.fairy);
   merge(DB.work, b.work);
   merge(DB.work.fanshi, b.work.fanshi);
   merge(DB.work.zhi, b.work.zhi);
@@ -118,6 +122,8 @@ var DB = load() || blankDB();
     c.status = ZHI_STAGE_MAP[c.stage] || "進到官方LINE";
     c.note = c.note || c.notes || "";
   });
+  var oldOneOnOneIdx = DB.work.zhi.courses.indexOf("一對一30堂+保證班");
+  if(oldOneOnOneIdx>-1) DB.work.zhi.courses.splice(oldOneOnOneIdx,1);
 })();
 save();
 
@@ -146,13 +152,17 @@ var HELP = {
   zhi_student:{t:"學生資訊 / 轉換率儀表板", w:"追蹤每位學生從加入官方LINE到成交的完整歷程，並依月份統計「加入LINE→Intro→體驗/線上講座→Demo→已購買」四段轉換率。", h:"點『＋新增學生』填寫各階段日期；卡片上的狀態下拉可快速更新目前階段（會自動補上對應日期，若已填則不覆蓋）。", r:"轉換率圖表與人數會即時依所選月份重新計算；可匯出當月報表。", u:"卡片『查看/編輯』可修改或刪除；日期填錯可直接改回。", e:"若某段轉換率顯示 0%，通常是該階段還沒有人到達下一步，非系統錯誤。"},
   zhi_funnel:{t:"轉換率圖表", w:"長條圖顯示每週加入LINE人數，折線圖顯示本月各階段轉換率。", h:"用上/本/下月切換區間；點『匯出本月報表』下載Excel。", r:"純資訊呈現，不會修改任何學生資料。", u:"無需撤銷。", e:"若圖表是平的，代表該月資料量太少或還沒有人加入LINE。"},
   zhi_seminar:{t:"講座名單", w:"管理講座/Webinar報名名單，追蹤『報名→加入LINE→諮詢→成交』四階段轉換率，可依月份切換。", h:"點『＋新增』登記報名者與各階段日期；『匯出Excel』輸出完整名單。", r:"漏斗圖表與轉換率會依填入的日期即時計算。", u:"清單項目可編輯或刪除。", e:"若漏斗顯示都是0，請確認有沒有填報名日期，這是漏斗的起點。"},
-  zhi_track:{t:"課程學生追蹤", w:"銷售管理新增的成交紀錄會自動同步到這裡；其中課程含「30hrs」且填了開課/結束日期的學生，系統會自動生成待辦提醒。", h:"這裡的資料是唯讀同步結果，開課/結束日期要到銷售管理的成交紀錄裡修改。", r:"30hrs自動待辦會出現在『今日→現在要做』與『每日計劃』，標籤為『30hrs自動』。", u:"刪除此列不會刪除原始成交紀錄；要修正日期請到銷售管理編輯。", e:"若沒看到自動待辦，請確認課程名稱裡有包含『30hrs』字樣，且開課/結束日期都已填寫。"},
+  zhi_track:{t:"課程學生追蹤", w:"銷售管理新增的成交紀錄會自動同步到『一般課程』；其中課程含「30hrs」且填了開課/結束日期的學生，系統會自動生成待辦提醒；『一對一』分頁另外追蹤一對一教學狀態。", h:"上方可搜尋學生姓名；這裡的資料是唯讀同步結果，開課/結束日期要到銷售管理的成交紀錄裡修改。", r:"30hrs自動待辦會出現在『今日→現在要做』與『每日計劃』，標籤為『30hrs自動』。", u:"刪除此列不會刪除原始成交紀錄；要修正日期請到銷售管理編輯。", e:"若沒看到自動待辦，請確認課程名稱裡有包含『30hrs』字樣，且開課/結束日期都已填寫。"},
+  zhi_oneonone:{t:"一對一母分頁", w:"追蹤一對一教學的老師/付款/上課時間/科目，學生在學生資訊填入程度檢測日期後會自動出現在這裡。", h:"卡片上的付款狀態下拉可快速切換；點『編輯』填寫老師、金額、上課時間與科目。", r:"付款狀態改成『已付款』會自動同步一筆到上方『一般課程』課程學生追蹤。", u:"可在編輯視窗刪除整筆；已付款自動同步的追蹤列可在課程學生追蹤刪除，不影響這裡的原始資料。", e:"若找不到某位學生，先確認學生資訊裡有沒有填程度檢測日期。"},
+  zhi_install:{t:"刷卡分期追蹤", w:"依付款方式自動判斷分幾期（例如刷卡分三期＝3），把總金額拆成每期金額，依購買月份往後排到對應月份，讓每月的營業額計算正確。", h:"用上/本/下月切換要看哪個月；『本月正確營業額』已經自動把分期金額拆算進去。", r:"純資訊呈現，不會修改任何成交紀錄。", u:"無需撤銷。", e:"若某筆分期沒有出現在列表，檢查付款方式名稱是否包含『分X期』文字（例如刷卡分三期）。"},
+  zhi_calc:{t:"價格試算", w:"快速試算一對一課程折扣價，以及三種固定費率方案的總金額。", h:"輸入堂數，下方會即時重新計算。", r:"純計算工具，不會儲存任何資料。", u:"無需撤銷。", e:"若金額看起來不對，確認堂數是否輸入為整數。"},
   zhi_sales:{t:"銷售管理", w:"記錄每一筆成交（金額、付款方式、課程、開課/結束日期），並自動同步到課程學生追蹤。", h:"點『＋新增成交紀錄』填寫；課程可複選；付款方式可用分頁篩選並個別匯出Excel。", r:"成交金額會計入總營收與平均客單價；同步建立/更新對應的課程學生追蹤列。", u:"刪除成交紀錄會一併移除對應的課程學生追蹤列（可在垃圾桶恢復）。", e:"若客單價顯示異常，檢查是否有金額輸入為0或負數的紀錄。"},
   work_zhi:{t:"知英語銷售顧問", w:"沿用原本『諮詢體驗小日記』的客戶追蹤邏輯（名單→已預約→已體驗→已成交/流失），介面改為凡蒔天地墨綠風格並整合進工作管理。", h:"新增客戶填來源/姓名/備註；用階段下拉更新目前進度；『最後聯繫』會自動記錄操作時間。", r:"停滯超過設定天數未更新的客戶會出現在今日『異常』；已預約但尚未體驗的會出現在『最近可以繼續』。", u:"刪除的客戶可在垃圾桶還原；階段可隨時改回前一步。", e:"若客戶清單是空的，這是全新模塊尚未匯入舊資料，可先用『新增客戶』手動建立或用示例資料體驗。"},
   work_courify:{t:"Courify 行銷", w:"目前是全新的空模塊，用於之後累積 Courify 相關的客戶、任務與內容，尚未有任何真實資料匯入。", h:"點『新增任務』開始記錄；結構與凡蒔顧問業務類似，方便之後擴充。", r:"新增後即成為工作管理下的真實資料，可被搜尋與關聯。", u:"刪除任務可在垃圾桶還原。", e:"若您預期這裡應該有舊資料，這是正確的——Courify 目前刻意保持空白，等您之後補充。"},
   search_global:{t:"跨模塊搜尋", w:"同時比對任務、內容選題、靈感、書單、工作客戶與收集箱裡的文字，不用記得東西存在哪個模塊。", h:"輸入關鍵字後按 Enter 或點搜尋圖示；點結果直接跳到來源模塊定位該項目。", r:"不會修改任何資料，純粹是查找定位。", u:"無需撤銷。", e:"若找不到，嘗試更短的關鍵字，或確認資料是否被刪除到垃圾桶。"},
   link_item:{t:"關聯項目", w:"把兩個不同模塊的項目連起來，例如把一則靈感連到一個內容選題，或把一個任務連到一個工作客戶。", h:"點『關聯』開啟選擇視窗，搜尋要連結的項目後點選即可建立。", r:"雙方項目下方都會出現可點擊的關聯標籤，點擊會跳到對方位置。", u:"點關聯標籤旁的『解除』可移除這條連結，不影響兩邊原始資料。", e:"若找不到要連的項目，代表它可能在垃圾桶中，需先還原才能建立關聯。"},
   ai_helper:{t:"AI 幫手", w:"這裡列出目前所有 AI 輔助功能的入口與說明。所有 AI 皆為本地規則模擬（確定性假資料），不會連線到真實外部 AI 服務，也不會有任何雲端費用。", h:"點各卡片會跳到對應模塊並觸發該項 AI 建議流程；每次重要建議都會先預覽再讓您確認。", r:"不使用時完全不影響資料；使用時遵循『先預覽、後確認』原則。", u:"任何 AI 套用前都可在預覽視窗取消。", e:"若覺得建議內容不合理，屬正常現象——這是規則模擬而非真正理解語意的 AI，僅供草稿參考。"},
+  fairy_zone:{t:"仙女媽咪專區", w:"追蹤與『仙女』『媽咪』相關的協調事項，可設定處理進度與優先級，優先級高的會自動排在最前面。", h:"點『新增項目』填標題、狀態、優先級；狀態下拉可隨時更新；『每日匯出Excel』輸出目前全部清單。", r:"優先級為高的項目會自動排到清單最上方，方便每天優先處理。", u:"刪除的項目可在設置的垃圾桶還原。", e:"若清單空白，先點『新增項目』建立第一筆。"},
   settings_guide:{t:"使用說明", w:"完整說明凡蒔天地目前的能力邊界：AI、帳號、資料保存、備份/還原、遷移、同步、伺服器、資料庫、API 與費用。", h:"往下捲動閱讀各段落；匯出/匯入按鈕可直接操作備份。", r:"僅為說明文字，閱讀不會改變任何資料。", u:"無需撤銷。", e:"若說明與實際功能有出入，請以本頁最新內容為準，並可回報讓我們更新。"},
   settings_changelog:{t:"更新日誌", w:"記錄凡蒔天地每次更新的日期、內容、影響範圍，以及您是否需要採取行動。", h:"由新到舊往下閱讀即可，無需操作。", r:"純資訊展示。", u:"無需撤銷。", e:"若某次更新標記『需要操作』卻不確定怎麼做，可對照該筆『影響範圍』說明處理。"},
   export_backup:{t:"匯出／匯入備份", w:"把目前所有資料輸出成一個 JSON 檔案，或用檔案還原資料，因為資料只存在這台瀏覽器的 localStorage，換裝置或清瀏覽器快取前務必先備份。", h:"點『匯出備份』下載檔案；點『匯入備份』選擇先前下載的檔案還原。", r:"匯出不影響現有資料；匯入會整份覆蓋目前資料。", u:"匯入前務必先匯出目前資料另存，才能在誤匯入時復原。", e:"若匯入後畫面異常，請重新整理頁面；若檔案格式錯誤會顯示錯誤提示並不會套用。"}
@@ -343,6 +353,26 @@ function computeFunnel(records, stageFields, periodFilterFn){
   return {counts:counts, rates:rates};
 }
 
+/* ---------------- 分期付款解析 ---------------- */
+var CN_NUM = {"一":1,"兩":2,"二":2,"三":3,"四":4,"五":5,"六":6,"七":7,"八":8,"九":9,"十":10};
+function installmentPeriods(payMethod){
+  if(!payMethod) return 1;
+  var m = String(payMethod).match(/分([一兩二三四五六七八九十]+)期/);
+  if(m) return CN_NUM[m[1]] || 1;
+  return 1;
+}
+function installmentSchedule(sale){
+  var periods = installmentPeriods(sale.payMethod);
+  var perPeriod = Math.round((+sale.amount||0)/periods);
+  var months = [];
+  for(var i=0;i<periods;i++){
+    var d = new Date(sale.purchaseDate+"T00:00:00");
+    d.setMonth(d.getMonth()+i);
+    months.push(d.getFullYear()+"-"+pad(d.getMonth()+1));
+  }
+  return {periods:periods, perPeriod:perPeriod, months:months};
+}
+
 /* ---------------- 30hrs 自動待辦 ---------------- */
 function lastWedMondayOf(endDate){
   if(!endDate) return null;
@@ -455,11 +485,12 @@ var ROUTES = {
   info:{label:"信息管理", icon:"📰"},
   books:{label:"我的書單", icon:"📚"},
   work:{label:"工作管理", icon:"💼"},
+  fairy:{label:"仙女媽咪專區", icon:"🧚"},
   search:{label:"搜尋", icon:"🔍"},
   ai:{label:"AI 幫手", icon:"✨"},
   settings:{label:"設置", icon:"⚙️"}
 };
-var DESKTOP_NAV = ["today","inbox","plan","life","media","info","books","work","settings"];
+var DESKTOP_NAV = ["today","inbox","plan","life","media","info","books","work","fairy","settings"];
 var MOBILE_BOTTOM = [
   {id:"today", label:"今日", ico:"🏡"},
   {id:"life", label:"健身", ico:"🌿"},
@@ -470,6 +501,7 @@ var MOBILE_BOTTOM = [
 var DRAWER_ITEMS = [
   {id:"plan", label:"每日計劃", ico:"🗓️"},
   {id:"work", label:"工作管理", ico:"💼"},
+  {id:"fairy", label:"仙女媽咪專區", ico:"🧚"},
   {id:"info", label:"信息管理", ico:"📰"},
   {id:"books", label:"我的書單", ico:"📚"},
   {id:"inbox", label:"收集箱", ico:"📥"},
@@ -497,6 +529,8 @@ window.addEventListener("hashchange", function(){
 
 /* ================= SHELL RENDER ================= */
 function render(){
+  run30hrsAutomation();
+  if(window.__FS.runOneOnOneAutoCreate) window.__FS.runOneOnOneAutoCreate();
   var root = document.getElementById("root");
   var isMobilePage = document.body.clientWidth <= 900;
   var pageHtml = renderPage(currentRoute);
@@ -682,12 +716,13 @@ window.__FS.monthLabel = monthLabel;
 window.__FS.shiftMonth = shiftMonth;
 window.__FS.computeFunnel = computeFunnel;
 window.__FS.run30hrsAutomation = run30hrsAutomation;
+window.__FS.installmentPeriods = installmentPeriods;
+window.__FS.installmentSchedule = installmentSchedule;
 window.__FS.pad = pad;
 
 window.__FS.init = function(){
   var r = (window.location.hash||"").replace("#/","");
   if(ROUTES[r]) currentRoute = r;
-  run30hrsAutomation();
   render();
 };
 

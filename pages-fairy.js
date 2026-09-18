@@ -32,7 +32,10 @@ F.openFairyModal = function(t){
     F.save(); F.closeModal(); F.toast("已儲存"); F.render();
   });
 };
-F.deleteFairy = function(t){ F.softDelete(F.DB.fairy.items, t.getAttribute("data-id")); F.save(); F.closeModal(); F.toast("已刪除"); F.render(); };
+F.deleteFairy = function(t){
+  if(!confirm("確定要刪除這個項目嗎？")) return;
+  F.softDelete(F.DB.fairy.items, t.getAttribute("data-id")); F.save(); F.closeModal(); F.toast("已刪除"); F.render();
+};
 F.fairyQuickStatus = function(sel){
   var it = F.DB.fairy.items.find(function(x){return x.id===sel.getAttribute("data-id");});
   if(it){ it.status = sel.value; F.save(); F.render(); }

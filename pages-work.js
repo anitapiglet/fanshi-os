@@ -24,7 +24,10 @@ F.openAddFanshiClient = function(){
     F.save(); F.closeModal(); F.render();
   });
 };
-F.deleteFanshiClient = function(t){ F.softDelete(F.DB.work.fanshi.clients, t.getAttribute("data-id")); F.save(); F.toast("已刪除"); F.render(); };
+F.deleteFanshiClient = function(t){
+  if(!confirm("確定要刪除這個客戶/案件嗎？")) return;
+  F.softDelete(F.DB.work.fanshi.clients, t.getAttribute("data-id")); F.save(); F.toast("已刪除"); F.render();
+};
 
 /* --- Courify --- */
 F.openAddCourifyTask = function(){
@@ -43,7 +46,10 @@ F.toggleCourifyTask = function(t){
   var task = F.DB.work.courify.tasks.find(function(x){return x.id===t.getAttribute("data-id");});
   if(task){ task.done = !task.done; F.save(); F.render(); }
 };
-F.deleteCourifyTask = function(t){ F.softDelete(F.DB.work.courify.tasks, t.getAttribute("data-id")); F.save(); F.render(); };
+F.deleteCourifyTask = function(t){
+  if(!confirm("確定要刪除這個任務嗎？")) return;
+  F.softDelete(F.DB.work.courify.tasks, t.getAttribute("data-id")); F.save(); F.render();
+};
 
 window.__PAGE_AFTER.work = function(){
   document.querySelectorAll(".fsStageSelect").forEach(function(sel){
@@ -71,22 +77,23 @@ var zhiInstallMonth = F.todayStr().slice(0,7);
 var zhiTrackSearch = "";
 var zhiTrackView = "general";
 var zhiOOSearch = "";
-var zhiCalcSessions = 10;
+var zhiCalcOOSessions = 10, zhiCalc390Sessions = 10, zhiCalc450Sessions = 10, zhiCalc500Sessions = 10;
 var ZHI_TEACHERS = ["Joanna","Florence","Jake","Other"];
 var ZHI_SUBJECTS = ["聽","說","讀","寫"];
 
 var ZHI_STAGES = [
-  {key:"進到官方LINE", color:"#77877e"},
+  {key:"保證金未付", color:"#c2685a"},
   {key:"程度檢測", color:"#b98b73"},
-  {key:"Intro", color:"#c99a4b"},
-  {key:"體驗課/線上講座", color:"#5c8577"},
+  {key:"體驗課/講座進行中", color:"#5c8577"},
   {key:"Demo", color:"#2f5d50"},
+  {key:"考慮中", color:"#77877e"},
   {key:"已購買", color:"#3f7a5e"},
-  {key:"lost deal", color:"#c2685a"}
+  {key:"lost deal", color:"#8a5b1c"}
 ];
+var ZHI_DEFAULT_STATUS = "保證金未付";
 var ZHI_STATUS_DATE_FIELD = {
-  "進到官方LINE":"lineJoinDate", "程度檢測":"assessDate", "Intro":"introDate",
-  "體驗課/線上講座":"trialDate", "Demo":"demoDate", "已購買":"purchaseDate", "lost deal":"lostDate"
+  "程度檢測":"assessDate", "體驗課/講座進行中":"trialDate", "Demo":"demoDate",
+  "已購買":"purchaseDate", "lost deal":"lostDate"
 };
 var ZHI_FUNNEL_FIELDS = [
   {field:"lineJoinDate", label:"加入LINE"},
@@ -97,7 +104,6 @@ var ZHI_FUNNEL_FIELDS = [
 ];
 var ZHI_SEMINAR_FIELDS = [
   {field:"signedUpDate", label:"報名"},
-  {field:"lineJoinDate", label:"加入LINE"},
   {field:"consultDate", label:"諮詢"},
   {field:"purchaseDate", label:"成交"}
 ];
@@ -206,13 +212,22 @@ F.exportZhiStudents = function(){
   F.exportExcel("知英語_學生資訊.xls", "學生資訊", ["姓名","狀態","加入LINE","Intro","體驗/線上講座","Demo","已購買","多益","雅思/托福","程度檢測分數","備註"], rows);
   F.toast("已匯出學生資訊，共 "+rows.length+" 筆");
 };
+var ZHI_HOUR_OPTIONS = (function(){ var a=[]; for(var h=9;h<=21;h++) a.push((h<10?"0"+h:h)+":00"); return a; })();
+function zhiTimeSelectHtml(name, val){
+  return '<select name="'+name+'"><option value="">—</option>'+ZHI_HOUR_OPTIONS.map(function(t){return '<option '+(t===val?"selected":"")+'>'+t+'</option>';}).join("")+'</select>';
+}
+function syncZhiCustomerPurchaseToTrack(c){
+  var track = F.DB.work.zhi.courseTracking.find(function(x){return x.custId===c.id;});
+  if(!track){ track = {id:F.uid(), custId:c.id, deletedAt:null, startDate:F.todayStr(), endDate:""}; F.DB.work.zhi.courseTracking.push(track); }
+  track.name = c.name; track.course = track.course || "(來自學生資訊-已購買)"; track.note = c.note||"";
+}
 F.openZhiCustomerModal = function(t){
   var id = t && t.getAttribute("data-id");
   var prefill = t && t.getAttribute("data-prefill");
   var c = id ? F.DB.work.zhi.customers.find(function(x){return x.id===id;}) : null;
   var v = function(k){ return c ? F.escapeHtml(c[k]||"") : ""; };
   var vd = function(k, d){ return c ? (c[k]||"") : (d||""); };
-  var statusOpts = ZHI_STAGES.map(function(s){ return '<option '+(c&&c.status===s.key?"selected":"")+'>'+s.key+'</option>'; }).join("");
+  var statusOpts = ZHI_STAGES.map(function(s){ return '<option '+((c?c.status===s.key:s.key===ZHI_DEFAULT_STATUS)?"selected":"")+'>'+s.key+'</option>'; }).join("");
   F.openModal(
     '<div class="modal-title">'+(c?"編輯":"新增")+'學生 '+F.helpBtn("zhi_student")+'</div>'+
     '<form id="zhiCustForm">'+
@@ -231,9 +246,10 @@ F.openZhiCustomerModal = function(t){
       '<label class="field">Intro 日期<input type="date" name="introDate" value="'+vd("introDate")+'"></label>'+
     '</div>'+
     '<div class="row" style="margin-top:8px">'+
-      '<label class="field">線上講座日期<input type="date" name="onlineSeminarDate" value="'+vd("onlineSeminarDate")+'"></label>'+
       '<label class="field">體驗課/線上講座日期<input type="date" name="trialDate" value="'+vd("trialDate")+'"></label>'+
+      '<label class="field">體驗課時間'+zhiTimeSelectHtml("trialTime", c?c.trialTime||"":"")+'</label>'+
     '</div>'+
+    '<div class="row" style="margin-top:8px"><label class="field">體驗課類型（例如：寫作/口說/線上講座）<input name="trialType" value="'+v("trialType")+'"></label></div>'+
     '<div class="row" style="margin-top:8px">'+
       '<label class="field">Demo 日期<input type="date" name="demoDate" value="'+vd("demoDate")+'"></label>'+
       '<label class="field">已購買日期<input type="date" name="purchaseDate" value="'+vd("purchaseDate")+'"></label>'+
@@ -252,23 +268,29 @@ F.openZhiCustomerModal = function(t){
       name:f.name.value.trim(), status:f.status.value,
       lineJoinDate:f.lineJoinDate.value, assessDate:f.assessDate.value, assessScore:f.assessScore.value.trim(),
       toeicScore:f.toeicScore.value.trim(), ieltsToeflScore:f.ieltsToeflScore.value.trim(),
-      introDate:f.introDate.value, onlineSeminarDate:f.onlineSeminarDate.value, trialDate:f.trialDate.value,
+      introDate:f.introDate.value, trialDate:f.trialDate.value, trialTime:f.trialTime.value, trialType:f.trialType.value.trim(),
       demoDate:f.demoDate.value, purchaseDate:f.purchaseDate.value, lostDate:f.lostDate.value,
       note:f.note.value.trim()
     };
     var dField = ZHI_STATUS_DATE_FIELD[obj.status];
     if(dField && !obj[dField]) obj[dField] = F.todayStr();
-    if(c){ Object.assign(c, obj); } else { F.DB.work.zhi.customers.push(Object.assign({id:F.uid(), deletedAt:null}, obj)); }
+    var target;
+    if(c){ Object.assign(c, obj); target=c; } else { target = Object.assign({id:F.uid(), deletedAt:null}, obj); F.DB.work.zhi.customers.push(target); }
+    if(target.status==="已購買") syncZhiCustomerPurchaseToTrack(target);
     F.save(); F.closeModal(); F.toast("已儲存"); F.render();
   });
 };
-F.deleteZhiCustomer = function(t){ F.softDelete(F.DB.work.zhi.customers, t.getAttribute("data-id")); F.save(); F.closeModal(); F.toast("已刪除"); F.render(); };
+F.deleteZhiCustomer = function(t){
+  if(!confirm("確定要刪除這位學生嗎？可以之後在垃圾桶恢復。")) return;
+  F.softDelete(F.DB.work.zhi.customers, t.getAttribute("data-id")); F.save(); F.closeModal(); F.toast("已刪除"); F.render();
+};
 F.zhiQuickStatus = function(sel){
   var c = F.DB.work.zhi.customers.find(function(x){return x.id===sel.getAttribute("data-id");});
   if(!c) return;
   c.status = sel.value;
   var dField = ZHI_STATUS_DATE_FIELD[c.status];
   if(dField && !c[dField]) c[dField] = F.todayStr();
+  if(c.status==="已購買") syncZhiCustomerPurchaseToTrack(c);
   F.save(); F.render();
   F.toast("已將「"+c.name+"」狀態改為 "+c.status);
 };
@@ -359,14 +381,11 @@ F.openZhiSeminarModal = function(t){
     '<form id="zhiSemForm">'+
     '<div class="row"><label class="field">姓名<input name="name" required value="'+v("name")+'"></label>'+
     '<label class="field">講座日期<input type="date" name="seminarDate" value="'+(s?s.seminarDate:F.todayStr())+'"></label></div>'+
-    '<div class="row" style="margin-top:8px"><label class="field">電話<input name="phone" value="'+v("phone")+'"></label>'+
-    '<label class="field">Email<input name="email" value="'+v("email")+'"></label></div>'+
     '<div class="row" style="margin-top:8px">'+
       '<label class="field">報名日期<input type="date" name="signedUpDate" value="'+(s?s.signedUpDate||"":F.todayStr())+'"></label>'+
-      '<label class="field">加入LINE日期<input type="date" name="lineJoinDate" value="'+(s?s.lineJoinDate||"":"")+'"></label>'+
+      '<label class="field">諮詢日期<input type="date" name="consultDate" value="'+(s?s.consultDate||"":"")+'"></label>'+
     '</div>'+
     '<div class="row" style="margin-top:8px">'+
-      '<label class="field">諮詢日期<input type="date" name="consultDate" value="'+(s?s.consultDate||"":"")+'"></label>'+
       '<label class="field">成交日期<input type="date" name="purchaseDate" value="'+(s?s.purchaseDate||"":"")+'"></label>'+
     '</div>'+
     '<label class="field" style="margin-top:8px">備註<textarea name="note" rows="2">'+v("note")+'</textarea></label>'+
@@ -378,18 +397,21 @@ F.openZhiSeminarModal = function(t){
   document.getElementById("zhiSemForm").addEventListener("submit", function(e){
     e.preventDefault();
     var f = e.target;
-    var obj = {name:f.name.value.trim(), seminarDate:f.seminarDate.value, phone:f.phone.value.trim(), email:f.email.value.trim(),
-      signedUpDate:f.signedUpDate.value, lineJoinDate:f.lineJoinDate.value, consultDate:f.consultDate.value, purchaseDate:f.purchaseDate.value,
+    var obj = {name:f.name.value.trim(), seminarDate:f.seminarDate.value,
+      signedUpDate:f.signedUpDate.value, consultDate:f.consultDate.value, purchaseDate:f.purchaseDate.value,
       note:f.note.value.trim()};
     if(s){ Object.assign(s, obj); } else { F.DB.work.zhi.seminars.push(Object.assign({id:F.uid(), deletedAt:null}, obj)); }
     F.save(); F.closeModal(); F.toast("已儲存"); F.render();
   });
 };
-F.deleteZhiSeminar = function(t){ F.softDelete(F.DB.work.zhi.seminars, t.getAttribute("data-id")); F.save(); F.closeModal(); F.toast("已刪除"); F.render(); };
+F.deleteZhiSeminar = function(t){
+  if(!confirm("確定要刪除這筆講座名單嗎？")) return;
+  F.softDelete(F.DB.work.zhi.seminars, t.getAttribute("data-id")); F.save(); F.closeModal(); F.toast("已刪除"); F.render();
+};
 F.exportZhiSeminar = function(){
   var recs = F.alive(F.DB.work.zhi.seminars);
-  var rows = recs.map(function(s){ return [s.name, F.fmtDate(s.seminarDate), s.phone||"", s.email||"", F.fmtDate(s.signedUpDate), F.fmtDate(s.lineJoinDate), F.fmtDate(s.consultDate), F.fmtDate(s.purchaseDate), s.note||""]; });
-  F.exportExcel("知英語_講座名單.xls", "講座名單", ["姓名","講座日期","電話","Email","報名","加入LINE","諮詢","成交","備註"], rows);
+  var rows = recs.map(function(s){ return [s.name, F.fmtDate(s.seminarDate), F.fmtDate(s.signedUpDate), F.fmtDate(s.consultDate), F.fmtDate(s.purchaseDate), s.note||""]; });
+  F.exportExcel("知英語_講座名單.xls", "講座名單", ["姓名","講座日期","報名","諮詢","成交","備註"], rows);
   F.toast("已匯出講座名單，共 "+rows.length+" 筆");
 };
 function renderZhiSeminar(){
@@ -397,7 +419,12 @@ function renderZhiSeminar(){
   var monthFilter = function(d){ return F.inMonth(d, ym); };
   var all = F.alive(F.DB.work.zhi.seminars);
   var funnel = F.computeFunnel(all, ZHI_SEMINAR_FIELDS, monthFilter);
-  var html = '<div class="card section">';
+  var wdCount = function(dow){ return all.filter(function(s){ return s.seminarDate && new Date(s.seminarDate+"T00:00:00").getDay()===dow; }).length; };
+  var html = '<div class="row" style="margin-bottom:14px">'+
+    '<div class="card" style="text-align:center"><div style="font-size:20px;font-weight:800">'+wdCount(2)+'</div><div style="font-size:11.5px;color:var(--muted)">週二總計</div></div>'+
+    '<div class="card" style="text-align:center"><div style="font-size:20px;font-weight:800">'+wdCount(4)+'</div><div style="font-size:11.5px;color:var(--muted)">週四總計</div></div>'+
+    '<div class="card" style="text-align:center"><div style="font-size:20px;font-weight:800">'+wdCount(6)+'</div><div style="font-size:11.5px;color:var(--muted)">週六總計</div></div></div>';
+  html += '<div class="card section">';
   html += '<div class="section-head"><h2>🎤 講座轉化漏斗 '+F.helpBtn("zhi_seminar")+'</h2>'+
     '<div class="row"><button class="btn sm secondary" data-action="zhiSeminarMonthPrev">← 上月</button>'+
     '<button class="btn sm secondary" data-action="zhiSeminarMonthThis">本月</button>'+
@@ -473,13 +500,17 @@ F.openZhiSaleModal = function(t){
   });
 };
 F.deleteZhiSale = function(t){
+  if(!confirm("確定要刪除這筆成交紀錄嗎？對應的課程學生追蹤列也會一併移除。")) return;
   var id = t.getAttribute("data-id");
   F.softDelete(F.DB.work.zhi.sales, id);
   var track = F.DB.work.zhi.courseTracking.find(function(x){return x.saleId===id;});
   if(track) F.softDelete(F.DB.work.zhi.courseTracking, track.id);
   F.save(); F.closeModal(); F.toast("已刪除"); F.render();
 };
-F.deleteZhiTrack = function(t){ F.softDelete(F.DB.work.zhi.courseTracking, t.getAttribute("data-id")); F.save(); F.toast("已刪除"); F.render(); };
+F.deleteZhiTrack = function(t){
+  if(!confirm("確定要刪除這筆課程學生追蹤列嗎？")) return;
+  F.softDelete(F.DB.work.zhi.courseTracking, t.getAttribute("data-id")); F.save(); F.toast("已刪除"); F.render();
+};
 F.zhiSalesPaySeg = function(t){ zhiSalesPay = t.getAttribute("data-pay"); F.render(); };
 F.exportZhiSalesAll = function(){
   var rows = F.alive(F.DB.work.zhi.sales).map(function(s){ return [s.student, F.fmtDate(s.purchaseDate), s.amount, s.payMethod, s.course, F.fmtDate(s.startDate), s.note||""]; });
@@ -532,6 +563,37 @@ F.runOneOnOneAutoCreate = function(){
   if(changed) F.save();
   return changed;
 };
+F.runDepositUnpaidReminder = function(){
+  var changed = false;
+  var today = F.todayStr();
+  F.alive(F.DB.work.zhi.customers).forEach(function(c){
+    if(c.status!=="保證金未付") return;
+    var taskId = "deposit_"+c.id+"_"+today;
+    if(!F.DB.tasks.some(function(t){return t.id===taskId;})){
+      F.DB.tasks.push({id:taskId, title:"保證金未付提醒："+c.name, date:today, time:"", category:"知英語", priority:"高", tags:["保證金未付自動"], done:false, createdAt:Date.now(), deletedAt:null, source:"保證金未付自動"});
+      changed = true;
+    }
+  });
+  if(changed) F.save();
+  return changed;
+};
+function renderZhiTrialCal(){
+  var list = F.alive(F.DB.work.zhi.customers).filter(function(c){return c.trialDate;}).sort(function(a,b){
+    return (a.trialDate+(a.trialTime||"00:00")).localeCompare(b.trialDate+(b.trialTime||"00:00"));
+  });
+  var html = '<div class="section-head"><h2>⏰ 體驗課行事曆 '+F.helpBtn("zhi_trialcal")+'</h2></div>';
+  if(!list.length){
+    html += '<div class="empty-state"><div class="e-ico">⏰</div><div>目前沒有安排體驗課的學生</div><div class="e-next">下一步：到學生資訊填入體驗課日期/時間即可出現在這裡</div></div>';
+  } else {
+    html += '<div class="list">'+list.map(function(c){
+      return '<div class="list-item"><div class="li-body"><div class="li-title">'+F.escapeHtml(c.name)+
+        (c.trialType?' <span class="tag">'+F.escapeHtml(c.trialType)+'</span>':"")+'</div>'+
+        '<div class="li-meta">'+F.fmtDate(c.trialDate)+' '+(c.trialTime||"未填時間")+'</div></div>'+
+        '<button class="btn sm ghost" data-action="openZhiCustomerModal" data-id="'+c.id+'">編輯</button></div>';
+    }).join("")+'</div>';
+  }
+  return html;
+}
 F.zhiOOQuickPay = function(sel){
   var oo = F.DB.work.zhi.oneOnOne.find(function(x){return x.id===sel.getAttribute("data-id");});
   if(!oo) return;
@@ -576,7 +638,10 @@ F.openZhiOOModal = function(t){
     F.save(); F.closeModal(); F.toast("已儲存"); F.render();
   });
 };
-F.deleteZhiOO = function(t){ F.softDelete(F.DB.work.zhi.oneOnOne, t.getAttribute("data-id")); F.save(); F.closeModal(); F.toast("已刪除"); F.render(); };
+F.deleteZhiOO = function(t){
+  if(!confirm("確定要刪除這位一對一學生的追蹤資料嗎？")) return;
+  F.softDelete(F.DB.work.zhi.oneOnOne, t.getAttribute("data-id")); F.save(); F.closeModal(); F.toast("已刪除"); F.render();
+};
 function renderZhiOneOnOne(){
   var all = F.alive(F.DB.work.zhi.oneOnOne).filter(function(o){ return !zhiOOSearch || o.name.indexOf(zhiOOSearch)>-1; });
   var html = '<div class="row" style="margin-bottom:12px"><input id="zhiOOSearchInput" placeholder="搜尋學生姓名..." value="'+F.escapeHtml(zhiOOSearch)+'"></div>';
@@ -668,13 +733,19 @@ F.addZhiCourseChip = function(){
   var v = input.value.trim(); if(!v){ F.toast("請輸入課程名稱"); return; }
   F.DB.work.zhi.courses.push(v); input.value=""; F.save(); F.render();
 };
-F.removeZhiCourseChip = function(t){ F.DB.work.zhi.courses.splice(+t.getAttribute("data-i"),1); F.save(); F.render(); };
+F.removeZhiCourseChip = function(t){
+  if(!confirm("確定要移除這個課程選項嗎？（不影響已存在的成交紀錄）")) return;
+  F.DB.work.zhi.courses.splice(+t.getAttribute("data-i"),1); F.save(); F.render();
+};
 F.addZhiPayChip = function(){
   var input = document.getElementById("zhiNewPayInput");
   var v = input.value.trim(); if(!v){ F.toast("請輸入付款方式"); return; }
   F.DB.work.zhi.payMethods.push(v); input.value=""; F.save(); F.render();
 };
-F.removeZhiPayChip = function(t){ F.DB.work.zhi.payMethods.splice(+t.getAttribute("data-i"),1); F.save(); F.render(); };
+F.removeZhiPayChip = function(t){
+  if(!confirm("確定要移除這個付款方式嗎？（不影響已存在的成交紀錄）")) return;
+  F.DB.work.zhi.payMethods.splice(+t.getAttribute("data-i"),1); F.save(); F.render();
+};
 function renderZhiSettings(){
   var html = '<div class="card section"><div class="card-title">課程選項</div><div class="chip-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">'+
     F.DB.work.zhi.courses.map(function(c,i){ return '<span class="pill">'+F.escapeHtml(c)+' <span data-action="removeZhiCourseChip" data-i="'+i+'" style="cursor:pointer;margin-left:4px">✕</span></span>'; }).join("")+
@@ -685,49 +756,75 @@ function renderZhiSettings(){
   return html;
 }
 
-F.setZhiCalcSessions = function(){
-  zhiCalcSessions = Math.max(1, Number(document.getElementById("zhiCalcInput").value) || 1);
+F.setZhiCalcInput = function(id, val){
+  var n = Math.max(1, Number(val)||1);
+  if(id==="zhiCalcOOInput") zhiCalcOOSessions = n;
+  else if(id==="zhiCalc390Input") zhiCalc390Sessions = n;
+  else if(id==="zhiCalc450Input") zhiCalc450Sessions = n;
+  else if(id==="zhiCalc500Input") zhiCalc500Sessions = n;
   F.render();
 };
 function oneOnOnePrice(n){
   var rate = n>=20?0.8 : n>=10?0.9 : n>=5?0.95 : 1;
   return {rate:rate, total:Math.round(1800*n*rate)};
 }
+var ZHI_GE_PLANS = [
+  {course:"GE40", label:"40堂 一次付", perSession:500, sessions:40, periods:1},
+  {course:"GE40", label:"40堂 分3期", perSession:510, sessions:40, periods:3},
+  {course:"GE80", label:"80堂 一次付", perSession:390, sessions:80, periods:1},
+  {course:"GE80", label:"80堂 分6期", perSession:405, sessions:80, periods:6},
+  {course:"GE120", label:"120堂 一次付", perSession:330, sessions:120, periods:1},
+  {course:"GE120", label:"120堂 分9期", perSession:340, sessions:120, periods:9},
+  {course:"GE160", label:"160堂 一次付", perSession:330, sessions:160, periods:1},
+  {course:"GE160", label:"160堂 分12期", perSession:340, sessions:160, periods:12}
+];
 function renderZhiCalc(){
-  var n = zhiCalcSessions;
-  var oo = oneOnOnePrice(n);
+  var oo = oneOnOnePrice(zhiCalcOOSessions);
   var html = '<div class="section-head"><h2>🧮 價格試算 '+F.helpBtn("zhi_calc")+'</h2></div>';
-  html += '<div class="card" style="max-width:360px;margin-bottom:16px"><label class="field">堂數<input type="number" id="zhiCalcInput" min="1" value="'+n+'" oninput="void 0"></label></div>';
-  html += '<div class="grid grid-2">'+
-    '<div class="card"><div style="font-size:12px;color:var(--muted)">一對一（原價 $1800/堂，5堂95折/10堂9折/20堂以上8折）</div>'+
-    '<div style="font-size:22px;font-weight:800;color:var(--primary-dark);margin-top:4px">NT$ '+oo.total.toLocaleString()+'</div>'+
-    '<div style="font-size:11.5px;color:var(--muted);margin-top:2px">折扣：'+Math.round((1-oo.rate)*100)+'%　單堂約 NT$ '+Math.round(oo.total/n).toLocaleString()+'</div></div>'+
-    '<div class="card"><div style="font-size:12px;color:var(--muted)">固定費率方案</div>'+
-    [390,450,500].map(function(rate){
-      return '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:14px"><span>$'+rate+' × '+n+' 堂</span><b>NT$ '+(rate*n).toLocaleString()+'</b></div>';
-    }).join("")+
-    '</div></div>';
+  html += '<div class="grid grid-2">';
+  html += '<div class="card"><div style="font-size:12px;color:var(--muted)">一對一（原價 $1800/堂，5堂95折/10堂9折/20堂以上8折）</div>'+
+    '<label class="field" style="margin-top:8px;max-width:180px">堂數<input type="number" id="zhiCalcOOInput" min="1" value="'+zhiCalcOOSessions+'"></label>'+
+    '<div style="font-size:22px;font-weight:800;color:var(--primary-dark);margin-top:8px">NT$ '+oo.total.toLocaleString()+'</div>'+
+    '<div style="font-size:11.5px;color:var(--muted);margin-top:2px">折扣：'+Math.round((1-oo.rate)*100)+'%　單堂約 NT$ '+Math.round(oo.total/zhiCalcOOSessions).toLocaleString()+'</div></div>';
+  [[390,"zhiCalc390Input",zhiCalc390Sessions],[450,"zhiCalc450Input",zhiCalc450Sessions],[500,"zhiCalc500Input",zhiCalc500Sessions]].forEach(function(row){
+    var rate=row[0], inputId=row[1], n=row[2];
+    html += '<div class="card"><div style="font-size:12px;color:var(--muted)">實力打造 $'+rate+'/堂</div>'+
+      '<label class="field" style="margin-top:8px;max-width:180px">堂數<input type="number" id="'+inputId+'" min="1" value="'+n+'"></label>'+
+      '<div style="font-size:22px;font-weight:800;color:var(--primary-dark);margin-top:8px">NT$ '+(rate*n).toLocaleString()+'</div></div>';
+  });
+  html += '</div>';
+  html += '<div class="section-head" style="margin-top:20px"><h2 style="font-size:16px">GE 預設套餐</h2></div>';
+  html += '<div class="table-wrap" style="overflow-x:auto"><table class="tbl" style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>'+
+    '<th style="text-align:left;padding:8px">課程</th><th style="text-align:left;padding:8px">方案</th><th style="text-align:left;padding:8px">單堂價</th><th style="text-align:left;padding:8px">總價</th><th style="text-align:left;padding:8px">期數</th><th style="text-align:left;padding:8px">每期金額</th></tr></thead><tbody>'+
+    ZHI_GE_PLANS.map(function(p){
+      var total = p.perSession*p.sessions;
+      var perPeriod = p.periods>1 ? Math.round(total/p.periods) : total;
+      return '<tr><td style="padding:8px">'+p.course+'</td><td style="padding:8px">'+p.label+'</td><td style="padding:8px">$'+p.perSession+'</td>'+
+        '<td style="padding:8px">NT$ '+total.toLocaleString()+'</td><td style="padding:8px">'+p.periods+'</td><td style="padding:8px">NT$ '+perPeriod.toLocaleString()+'</td></tr>';
+    }).join("")+'</tbody></table></div>';
   return html;
 }
 
 window.__ZHI_AFTER = function(){
   var s1 = document.getElementById("zhiStudentSearchInput");
-  if(s1) s1.addEventListener("input", function(){ zhiStudentSearch = s1.value; F.render(); });
+  if(s1) s1.addEventListener("input", function(){ var v=s1.value; F.debounced("zhiStudentSearch", function(){ zhiStudentSearch=v; F.render(); }); });
   var s2 = document.getElementById("zhiStudentStatusSel");
   if(s2) s2.addEventListener("change", function(){ zhiStudentStatus = s2.value; F.render(); });
   document.querySelectorAll(".zhiQuickStatusSel").forEach(function(sel){ sel.onchange = function(){ F.zhiQuickStatus(sel); }; });
   var s3 = document.getElementById("zhiTrackSearchInput");
-  if(s3) s3.addEventListener("input", function(){ zhiTrackSearch = s3.value; F.render(); });
+  if(s3) s3.addEventListener("input", function(){ var v=s3.value; F.debounced("zhiTrackSearch", function(){ zhiTrackSearch=v; F.render(); }); });
   var s4 = document.getElementById("zhiOOSearchInput");
-  if(s4) s4.addEventListener("input", function(){ zhiOOSearch = s4.value; F.render(); });
+  if(s4) s4.addEventListener("input", function(){ var v=s4.value; F.debounced("zhiOOSearch", function(){ zhiOOSearch=v; F.render(); }); });
   document.querySelectorAll(".zhiOOPaySel").forEach(function(sel){ sel.onchange = function(){ F.zhiOOQuickPay(sel); }; });
-  var s5 = document.getElementById("zhiCalcInput");
-  if(s5) s5.addEventListener("input", F.setZhiCalcSessions);
+  ["zhiCalcOOInput","zhiCalc390Input","zhiCalc450Input","zhiCalc500Input"].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.addEventListener("input", function(){ var v=el.value; F.debounced(id, function(){ F.setZhiCalcInput(id, v); }); });
+  });
 };
 
 var ZHI_SUB_TABS = [
   {key:"cal", label:"日曆紀錄"}, {key:"students", label:"學生資訊"}, {key:"seminar", label:"講座名單"},
-  {key:"track", label:"課程學生追蹤"}, {key:"sales", label:"銷售管理"}, {key:"calc", label:"價格試算"}, {key:"settings", label:"設定"}
+  {key:"track", label:"課程學生追蹤"}, {key:"trialcal", label:"體驗課行事曆"}, {key:"sales", label:"銷售管理"}, {key:"calc", label:"價格試算"}, {key:"settings", label:"設定"}
 ];
 function renderZhiRoot(){
   var html = '<div class="tabs" style="margin-top:6px">'+ZHI_SUB_TABS.map(function(s){
@@ -737,6 +834,7 @@ function renderZhiRoot(){
   else if(zhiSub==="students") html += renderZhiStudents();
   else if(zhiSub==="seminar") html += renderZhiSeminar();
   else if(zhiSub==="track") html += renderZhiTrack();
+  else if(zhiSub==="trialcal") html += renderZhiTrialCal();
   else if(zhiSub==="sales") html += renderZhiSales();
   else if(zhiSub==="calc") html += renderZhiCalc();
   else if(zhiSub==="settings") html += renderZhiSettings();

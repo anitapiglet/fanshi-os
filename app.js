@@ -5,7 +5,7 @@
 "use strict";
 
 var STORE_KEY = "fanshi_os_db_v1";
-var APP_VERSION = "1.2.0";
+var APP_VERSION = "1.3.0";
 window.__PAGES = window.__PAGES || {};
 window.__PAGE_AFTER = window.__PAGE_AFTER || {};
 window.__FS = window.__FS || {};
@@ -83,7 +83,8 @@ function blankDB(){
       {date:"2026-09-16", version:"1.0.0", content:"凡蒔天地正式上線：今日總覽、收集箱、每日計劃、生活管理健身、自媒體運營、信息管理、我的書單、工作管理（凡蒔顧問／知英語／Courify）、設置八大模塊；建立跨模塊搜尋與關聯、AI 本地模擬建議（收集箱去向／每日跟練／熱點轉選題）、手機底部導覽與『更多』抽屜。", impact:"全新功能，不影響既有資料（尚無舊版本）。", action:"無需操作；可於今日頁點『填充演示數據』快速體驗。"},
       {date:"2026-09-18", version:"1.1.0", content:"知英語銷售顧問大改版：新增日曆紀錄（每日Intro/Demo追蹤+週報匯出）、學生資訊改為『進到官方LINE→程度檢測→Intro→體驗課/線上講座→Demo→已購買』新流程並加上多益/雅思托福/程度檢測分數欄位、月切換轉換率儀表板（長條圖+折線圖+Excel匯出）、講座名單簡化為報名/加入LINE/諮詢/成交四段漏斗、新增LINE加入名單快速記錄（自動週/月統計）、課程學生追蹤自動同步銷售紀錄，並新增30hrs課程5條自動待辦規則（會自動寫入今日→現在要做）。", impact:"知英語舊版客戶資料會自動轉換到新欄位（原名單/已預約/已體驗/已成交/流失 對應到新的狀態），不會遺失；30hrs自動待辦僅在課程名稱含『30hrs』且填了開課/結束日期時才會產生。", action:"若之前手動建立過知英語客戶，建議打開確認一次新欄位是否需要補填日期；其餘無需操作。"},
       {date:"2026-09-18", version:"1.1.1", content:"修正銷售管理新增成交紀錄裡課程複選框排版錯亂的問題（checkbox 被全域樣式撐成滿寬）；將『課程學生追蹤』從銷售管理拆成獨立分頁；移除『LINE加入名單』快速記錄分頁（加入LINE日期仍保留在學生資訊/講座名單欄位中，不影響轉換率計算）。", impact:"若之前用過LINE加入名單記錄過資料，資料還在，只是暫時沒有畫面可管理；未來如需要可以再加回來。", action:"無需操作。"},
-      {date:"2026-09-18", version:"1.2.0", content:"知英語新增：課程學生追蹤搜尋、刷卡分期追蹤（自動拆算每月正確營業額）、一對一母分頁（程度檢測日期自動觸發，已付款自動同步至課程學生追蹤）、課程選項調整（移除一對一30堂+保證班，一對一改為彈出填購買堂數）、價格試算工具。凡蒔天地新增『仙女媽咪專區』模組（狀態/優先級管理，高優先自動排前，可每日匯出Excel）。", impact:"知英語舊資料不受影響；仙女媽咪專區為全新空模塊。", action:"無需操作。"}
+      {date:"2026-09-18", version:"1.2.0", content:"知英語新增：課程學生追蹤搜尋、刷卡分期追蹤（自動拆算每月正確營業額）、一對一母分頁（程度檢測日期自動觸發，已付款自動同步至課程學生追蹤）、課程選項調整（移除一對一30堂+保證班，一對一改為彈出填購買堂數）、價格試算工具。凡蒔天地新增『仙女媽咪專區』模組（狀態/優先級管理，高優先自動排前，可每日匯出Excel）。", impact:"知英語舊資料不受影響；仙女媽咪專區為全新空模塊。", action:"無需操作。"},
+      {date:"2026-09-18", version:"1.3.0", content:"知英語大改版：學生狀態改為保證金未付/程度檢測/體驗課講座進行中/Demo/考慮中/已購買（保證金未付會每天自動產生待辦提醒；已購買會自動同步到課程學生追蹤）；新增體驗課行事曆（含時間/類型）；講座名單簡化（移除電話/Email/加入LINE欄位，漏斗改為報名→諮詢→成交，新增週二/四/六總計）；價格試算改版（實力打造390/450/500各自獨立堂數，GE新增8組預設套餐）；30hrs自動待辦新增第6條「關心第一堂課」；所有刪除動作都會先跳出確認；搜尋輸入加防抖動並修正輸入時失焦問題。", impact:"舊版『進到官方LINE/Intro』狀態的學生資料會保留原始文字顯示，但下拉選單只能選新的6種狀態，需要的話請手動更新一次；其餘資料不受影響。", action:"若有學生卡在舊狀態文字（例如顯示『Intro』），建議打開該學生編輯一次，重新選擇新狀態。"}
     ],
     settingsUi:{ lastBackupAt:null }
   };
@@ -155,6 +156,7 @@ var HELP = {
   zhi_track:{t:"課程學生追蹤", w:"銷售管理新增的成交紀錄會自動同步到『一般課程』；其中課程含「30hrs」且填了開課/結束日期的學生，系統會自動生成待辦提醒；『一對一』分頁另外追蹤一對一教學狀態。", h:"上方可搜尋學生姓名；這裡的資料是唯讀同步結果，開課/結束日期要到銷售管理的成交紀錄裡修改。", r:"30hrs自動待辦會出現在『今日→現在要做』與『每日計劃』，標籤為『30hrs自動』。", u:"刪除此列不會刪除原始成交紀錄；要修正日期請到銷售管理編輯。", e:"若沒看到自動待辦，請確認課程名稱裡有包含『30hrs』字樣，且開課/結束日期都已填寫。"},
   zhi_oneonone:{t:"一對一母分頁", w:"追蹤一對一教學的老師/付款/上課時間/科目，學生在學生資訊填入程度檢測日期後會自動出現在這裡。", h:"卡片上的付款狀態下拉可快速切換；點『編輯』填寫老師、金額、上課時間與科目。", r:"付款狀態改成『已付款』會自動同步一筆到上方『一般課程』課程學生追蹤。", u:"可在編輯視窗刪除整筆；已付款自動同步的追蹤列可在課程學生追蹤刪除，不影響這裡的原始資料。", e:"若找不到某位學生，先確認學生資訊裡有沒有填程度檢測日期。"},
   zhi_install:{t:"刷卡分期追蹤", w:"依付款方式自動判斷分幾期（例如刷卡分三期＝3），把總金額拆成每期金額，依購買月份往後排到對應月份，讓每月的營業額計算正確。", h:"用上/本/下月切換要看哪個月；『本月正確營業額』已經自動把分期金額拆算進去。", r:"純資訊呈現，不會修改任何成交紀錄。", u:"無需撤銷。", e:"若某筆分期沒有出現在列表，檢查付款方式名稱是否包含『分X期』文字（例如刷卡分三期）。"},
+  zhi_trialcal:{t:"體驗課行事曆", w:"依日期+時間排序，列出所有已安排體驗課的學生，一次看清楚誰幾點上什麼類型的體驗課。", h:"到學生資訊填入體驗課日期/時間/類型即會出現在這裡；點『編輯』可修改。", r:"純檢視列表，不會另外儲存資料。", u:"無需撤銷。", e:"若學生沒出現，檢查是否已填體驗課日期。"},
   zhi_calc:{t:"價格試算", w:"快速試算一對一課程折扣價，以及三種固定費率方案的總金額。", h:"輸入堂數，下方會即時重新計算。", r:"純計算工具，不會儲存任何資料。", u:"無需撤銷。", e:"若金額看起來不對，確認堂數是否輸入為整數。"},
   zhi_sales:{t:"銷售管理", w:"記錄每一筆成交（金額、付款方式、課程、開課/結束日期），並自動同步到課程學生追蹤。", h:"點『＋新增成交紀錄』填寫；課程可複選；付款方式可用分頁篩選並個別匯出Excel。", r:"成交金額會計入總營收與平均客單價；同步建立/更新對應的課程學生追蹤列。", u:"刪除成交紀錄會一併移除對應的課程學生追蹤列（可在垃圾桶恢復）。", e:"若客單價顯示異常，檢查是否有金額輸入為0或負數的紀錄。"},
   work_zhi:{t:"知英語銷售顧問", w:"沿用原本『諮詢體驗小日記』的客戶追蹤邏輯（名單→已預約→已體驗→已成交/流失），介面改為凡蒔天地墨綠風格並整合進工作管理。", h:"新增客戶填來源/姓名/備註；用階段下拉更新目前進度；『最後聯繫』會自動記錄操作時間。", r:"停滯超過設定天數未更新的客戶會出現在今日『異常』；已預約但尚未體驗的會出現在『最近可以繼續』。", u:"刪除的客戶可在垃圾桶還原；階段可隨時改回前一步。", e:"若客戶清單是空的，這是全新模塊尚未匯入舊資料，可先用『新增客戶』手動建立或用示例資料體驗。"},
@@ -389,6 +391,7 @@ function run30hrsAutomation(){
     if(!ct.course || ct.course.indexOf("30hrs")===-1) return;
     if(!ct.startDate || !ct.endDate) return;
     var rules = [
+      {key:"firstClass", date: ct.startDate, title: "關心 "+ct.name+" 第一堂課"},
       {key:"week2", date: addDays(ct.startDate,7), title: ct.name+" 預約寫作/口說 實戰課程"},
       {key:"mockAfter", date: addDays(ct.endDate,-7), title: ct.name+" Mock test after"},
       {key:"missHw", date: addDays(ct.endDate,-7), title: "詢問老師 "+ct.name+" 缺作業"},
@@ -528,9 +531,19 @@ window.addEventListener("hashchange", function(){
 });
 
 /* ================= SHELL RENDER ================= */
+var __debounceTimers = {};
+function debounced(key, fn, delay){
+  clearTimeout(__debounceTimers[key]);
+  __debounceTimers[key] = setTimeout(fn, delay||180);
+}
 function render(){
   run30hrsAutomation();
   if(window.__FS.runOneOnOneAutoCreate) window.__FS.runOneOnOneAutoCreate();
+  if(window.__FS.runDepositUnpaidReminder) window.__FS.runDepositUnpaidReminder();
+  var active = document.activeElement;
+  var activeId = active && active.id;
+  var selStart = active && typeof active.selectionStart==="number" ? active.selectionStart : null;
+  var selEnd = active && typeof active.selectionEnd==="number" ? active.selectionEnd : null;
   var root = document.getElementById("root");
   var isMobilePage = document.body.clientWidth <= 900;
   var pageHtml = renderPage(currentRoute);
@@ -546,6 +559,13 @@ function render(){
     renderBottomNav();
   bindGlobalEvents();
   if(window.__PAGE_AFTER && window.__PAGE_AFTER[currentRoute]) window.__PAGE_AFTER[currentRoute]();
+  if(activeId){
+    var el = document.getElementById(activeId);
+    if(el && (el.tagName==="INPUT"||el.tagName==="SELECT"||el.tagName==="TEXTAREA")){
+      el.focus();
+      if(selStart!=null && el.setSelectionRange){ try{ el.setSelectionRange(selStart, selEnd); }catch(e){} }
+    }
+  }
 }
 
 function renderSidebar(){
@@ -716,6 +736,7 @@ window.__FS.monthLabel = monthLabel;
 window.__FS.shiftMonth = shiftMonth;
 window.__FS.computeFunnel = computeFunnel;
 window.__FS.run30hrsAutomation = run30hrsAutomation;
+window.__FS.debounced = debounced;
 window.__FS.installmentPeriods = installmentPeriods;
 window.__FS.installmentSchedule = installmentSchedule;
 window.__FS.pad = pad;
